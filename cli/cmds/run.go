@@ -35,8 +35,6 @@ func runRun(args ...string) int {
 		return 1
 	}
 
-	log.Println(fmt.Sprintf("%s", config))
-
 	// Step 1. If it's run locally, just run the command as you would otherwise.
 	//
 	// Step 2. If it's being run online, ping the machines to verify that
@@ -48,6 +46,13 @@ func runRun(args ...string) int {
 	//         appropriate http requests as needed.
 	//
 	// Step 4. Alert the user of the addresses of the services.
+	application := config["application"].(map[interface{}]interface{})
+	log.Println(fmt.Sprintf("App name: %s", application["name"]))
+
+	services := config["services"].(map[interface{}]interface{})
+	for name, _ := range services {
+		log.Println(name)
+	}
 
 	go func() {
 		<-signals
