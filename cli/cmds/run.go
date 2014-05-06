@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/signal"
 
 	"launchpad.net/goyaml"
 )
@@ -14,6 +16,12 @@ func init() {
 }
 
 func runRun(args ...string) int {
+	// Register signals
+	signals := make(chan os.Signal, 1)
+	done := make(chan int, 1)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+	defer signal.Stop(signals)
+
 	// Read in .yaml file.
 	data, err := ioutil.ReadFile("crosswalk.yaml")
 	if err != nil {
@@ -41,5 +49,10 @@ func runRun(args ...string) int {
 	//
 	// Step 4. Alert the user of the addresses of the services.
 
-	return 0
+	go func() {
+		<-signals
+		done <- 0
+	}()
+
+	return <-done
 }
