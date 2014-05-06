@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/signal"
 
 	"launchpad.net/goyaml"
 )
@@ -14,6 +16,12 @@ func init() {
 }
 
 func runRun(args ...string) int {
+	// Register signals
+	signals := make(chan os.Signal, 1)
+	done := make(chan int, 1)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+	defer signal.Stop(signals)
+
 	// Read in .yaml file.
 	data, err := ioutil.ReadFile("crosswalk.yaml")
 	if err != nil {
@@ -21,13 +29,11 @@ func runRun(args ...string) int {
 	}
 
 	// Unmarshal the .yaml configuration.
-	var config interface{}
+	var config map[string]interface{}
 	if err := goyaml.Unmarshal(data, &config); err != nil {
 		log.Println("Invalid YAML.")
 		return 1
 	}
-
-	log.Println(fmt.Sprintf("%s", config))
 
 	// Step 1. If it's run locally, just run the command as you would otherwise.
 	//
@@ -40,6 +46,18 @@ func runRun(args ...string) int {
 	//         appropriate http requests as needed.
 	//
 	// Step 4. Alert the user of the addresses of the services.
+	application := config["application"].(map[interface{}]interface{})
+	log.Println(fmt.Sprintf("App name: %s", application["name"]))
 
-	return 0
+	services := config["services"].(map[interface{}]interface{})
+	for name, _ := range services {
+		log.Println(name)
+	}
+
+	go func() {
+		<-signals
+		done <- 0
+	}()
+
+	return <-done
 }

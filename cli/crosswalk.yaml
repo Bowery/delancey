@@ -1,0 +1,13 @@
+application:
+  name: "My Test App"
+services:
+  api:
+    address: "0.0.0.0"
+    commands:
+      build: "npm install"
+      test: "npm test"
+      start: "node app.js"
+  db:
+    address: "1.1.1.1"
+    commands:
+      start: "mongod"
