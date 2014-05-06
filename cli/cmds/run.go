@@ -20,7 +20,7 @@ func runRun(args ...string) int {
 		return 1
 	}
 
-	// Unmarshal the .yaml configuration/
+	// Unmarshal the .yaml configuration.
 	var config interface{}
 	if err := goyaml.Unmarshal(data, &config); err != nil {
 		log.Println("Invalid YAML.")
