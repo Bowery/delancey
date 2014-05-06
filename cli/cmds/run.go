@@ -29,7 +29,7 @@ func runRun(args ...string) int {
 	}
 
 	// Unmarshal the .yaml configuration.
-	var config interface{}
+	var config map[string]interface{}
 	if err := goyaml.Unmarshal(data, &config); err != nil {
 		log.Println("Invalid YAML.")
 		return 1
