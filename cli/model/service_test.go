@@ -1,3 +1,4 @@
+// Copyright 2013-2014 Bowery, Inc.
 package model
 
 import (
@@ -16,13 +17,13 @@ func init() {
 		Commands: map[string]string{
 			"build": "go get",
 			"test":  "go test ./...",
-			"run":   "go run main.go",
+			"start": "go run main.go",
 		},
 	}
 }
 
-func TestPing(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(pingHandler))
+func TestPingSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(pingSuccessHandler))
 	defer server.Close()
 
 	service.Address = server.URL
@@ -32,6 +33,26 @@ func TestPing(t *testing.T) {
 	}
 }
 
-func pingHandler(res http.ResponseWriter, req *http.Request) {
+func pingSuccessHandler(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte("ok"))
+}
+
+func TestPingFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(pingFailureHandler))
+	defer server.Close()
+
+	service.Address = server.URL
+
+	err := service.Ping()
+	if err == nil {
+		t.Fatal(err)
+	}
+
+	if err.Error() != "Unexpected response." {
+		t.Error("Bad response.")
+	}
+}
+
+func pingFailureHandler(res http.ResponseWriter, req *http.Request) {
+	res.Write([]byte("bad"))
 }

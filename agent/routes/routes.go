@@ -1,3 +1,4 @@
+// Copyright 2013-2014 Bowery, Inc.
 package routes
 
 func HandleNewService() string {
@@ -9,5 +10,9 @@ func HandleUpdateService() string {
 }
 
 func HandleGetService() string {
-	return "Get"
+	return "Crosswalk Agent"
+}
+
+func HandlePingService() string {
+	return "ok"
 }
