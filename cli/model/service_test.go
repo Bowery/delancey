@@ -17,7 +17,7 @@ func init() {
 		Commands: map[string]string{
 			"build": "go get",
 			"test":  "go test ./...",
-			"run":   "go run main.go",
+			"start": "go run main.go",
 		},
 	}
 }

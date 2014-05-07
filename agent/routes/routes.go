@@ -10,7 +10,7 @@ func HandleUpdateService() string {
 }
 
 func HandleGetService() string {
-	return "Get"
+	return "Crosswalk Agent"
 }
 
 func HandlePingService() string {

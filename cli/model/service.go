@@ -13,6 +13,9 @@ type Service struct {
 
 	// A map of commands.
 	Commands map[string]string `commands`
+
+	// Location of files.
+	Path string `path`
 }
 
 // Ping the service. If the machine is inaccessible
@@ -34,5 +37,13 @@ func (s *Service) Ping() error {
 		return errors.New("Unexpected response.")
 	}
 
+	return nil
+}
+
+func (s *Service) Upload() error {
+	return nil
+}
+
+func (s *Service) Update() error {
 	return nil
 }
