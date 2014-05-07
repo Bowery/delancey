@@ -1,8 +1,9 @@
+# Copyright 2013-2014 Bowery, Inc.
 Vagrant.configure("2") do |config|
   config.vm.box = "hashicorp/precise64"
   config.vm.define "server" do |server|
     server.vm.hostname = "server"
-    server.vm.synced_folder ENV["GOPATH"] + "/src/Bowery/crosswalk", "/home/vagrant/gocode/src/Bowery/crosswalk"
+    server.vm.synced_folder ENV["GOPATH"] + "/src", "/home/vagrant/gocode/src"
     server.vm.network "private_network", ip: "10.0.0.11"
 
     $script = <<-SCRIPT

@@ -12,9 +12,10 @@ func main() {
 	runtime.GOMAXPROCS(1)
 
 	s := server.Classic()
-	s.Get("/", routes.HandleNewService)
+	s.Post("/", routes.HandleNewService)
 	s.Put("/", routes.HandleUpdateService)
 	s.Get("/", routes.HandleGetService)
+	s.Get("/ping", routes.HandlePingService)
 
 	s.Run()
 }
