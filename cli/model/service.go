@@ -2,9 +2,16 @@
 package model
 
 import (
+	"Bowery/Mir/cli/tar"
+	"bytes"
+	"cli/log"
 	"errors"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 type Service struct {
@@ -41,6 +48,59 @@ func (s *Service) Ping() error {
 }
 
 func (s *Service) Upload() error {
+	// Package the upload.
+	path := filepath.Join(".crosswalk", "upload.tgz")
+	upload, err := tar.Tar(s.Path)
+	if err != nil {
+		return err
+	}
+
+	// Create .crosswalk dir.
+	if err = os.MkdirAll(".crosswalk", 0755); err != nil {
+		return err
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		log.Debug(err)
+		return err
+	}
+
+	defer os.RemoveAll(path)
+	defer file.Close()
+
+	_, err = io.Copy(file, upload)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Seek(0, os.SEEK_SET)
+	if err != nil {
+		return err
+	}
+
+	// Create request.
+	var body bytes.Buffer
+
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "upload")
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.Post("http://"+s.Address, writer.FormDataContentType(), &body)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	// TODO(steve): handle response
+
 	return nil
 }
 
