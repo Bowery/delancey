@@ -94,12 +94,13 @@ func runRun(args ...string) int {
 
 	// Add sync port to service address.
 	service := config.Service
-	service.Address += ":3001"
+	service.Address += ":3000"
 
 	// Attempt to reach server.
 	if err = service.Ping(); err != nil {
+		log.Println("red", err.Error())
 		log.Println("yellow", "Unable to connect to "+service.Address+". Make sure you've entered a valid address")
-		log.Println("yellow", "and that port 3001 is publically accessible.")
+		log.Println("yellow", "and that port 3000 is publically accessible.")
 		return 1
 	}
 

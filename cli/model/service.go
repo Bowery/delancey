@@ -18,7 +18,7 @@ type Service struct {
 // Ping the service. If the machine is inaccessible
 // or does not respond as expected, return error.
 func (s *Service) Ping() error {
-	res, err := http.Get(s.Address + "/ping")
+	res, err := http.Get("http://" + s.Address + "/ping")
 	if err != nil {
 		return err
 	}
