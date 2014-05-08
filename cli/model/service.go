@@ -2,9 +2,9 @@
 package model
 
 import (
-	"Bowery/Mir/cli/tar"
+	"Bowery/crosswalk/cli/log"
+	"Bowery/crosswalk/cli/tar"
 	"bytes"
-	"cli/log"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -89,6 +89,9 @@ func (s *Service) Upload() error {
 	}
 
 	_, err = io.Copy(part, file)
+	if err == nil {
+		err = writer.Close()
+	}
 	if err != nil {
 		return err
 	}
@@ -101,6 +104,7 @@ func (s *Service) Upload() error {
 
 	// TODO(steve): handle response
 
+	os.RemoveAll(".crosswalk")
 	return nil
 }
 
@@ -158,5 +162,6 @@ func (s *Service) Update(name, status string) error {
 
 	// TODO(steve): handle response
 
+	os.RemoveAll(".crosswalk")
 	return nil
 }
