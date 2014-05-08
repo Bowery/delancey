@@ -11,12 +11,11 @@ import (
 func main() {
 	// Parse flags and get arguments.
 	flag.Parse()
-	args := flag.Args()
-	command := "help"
+	command := "run"
+	commandArgs := flag.Args()
 
-	if len(args) >= 1 {
-		command = args[0]
-		args = args[1:]
+	if len(commandArgs) >= 1 {
+		command = commandArgs[0]
 	}
 
 	// Run command, and handle invalid commands.
@@ -25,5 +24,5 @@ func main() {
 		log.Println("Invalid command.")
 		os.Exit(1)
 	}
-	os.Exit(cmd.Run(args...))
+	os.Exit(cmd.Run())
 }

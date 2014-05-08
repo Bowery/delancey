@@ -4,8 +4,8 @@
 package prompt
 
 import (
-	"Bowery/crosswalk/errors"
-	"Bowery/crosswalk/log"
+	"Bowery/crosswalk/cli/errors"
+	"Bowery/crosswalk/cli/log"
 	"io"
 	"os"
 	"strings"
