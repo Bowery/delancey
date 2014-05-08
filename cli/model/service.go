@@ -104,6 +104,59 @@ func (s *Service) Upload() error {
 	return nil
 }
 
-func (s *Service) Update() error {
+func (s *Service) Update(name, status string) error {
+	// Ignore anything in .crosswalk
+	path := filepath.Join(s.Path, name)
+	if path == ".crosswalk/upload.tgz" {
+		return nil
+	}
+
+	var body bytes.Buffer
+
+	writer := multipart.NewWriter(&body)
+	err := writer.WriteField("type", status)
+	if err == nil {
+		err = writer.WriteField("path", name)
+	}
+	if err != nil {
+		return err
+	}
+
+	if status == "update" || status == "create" {
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		part, err := writer.CreateFormFile("file", "upload")
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(part, file)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err = writer.Close(); err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PUT", "http://"+s.Address, &body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	// TODO(steve): handle response
+
 	return nil
 }
