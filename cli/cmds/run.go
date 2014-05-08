@@ -149,11 +149,8 @@ func runRun(args ...string) int {
 		}
 		for {
 			select {
-			case service := <-syncer.Upload:
-				log.Println("red", service)
 			case ev := <-syncer.Event:
-				log.Println("", ev)
-				if err := service.Update(); err != nil {
+				if err := service.Update(ev.Path, ev.Status); err != nil {
 					done <- 1
 				}
 			}
