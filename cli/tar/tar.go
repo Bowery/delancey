@@ -76,7 +76,7 @@ func Tar(dir string) (io.Reader, error) {
 		return nil
 	}
 
-	err = filepath.Walk(dir, walker)
+	err := filepath.Walk(dir, walker)
 	if err != nil {
 		return nil, err
 	}

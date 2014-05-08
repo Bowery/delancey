@@ -83,6 +83,9 @@ func (s *Service) Upload() error {
 	var body bytes.Buffer
 
 	writer := multipart.NewWriter(&body)
+	writer.WriteField("build", s.Commands["build"])
+	writer.WriteField("test", s.Commands["test"])
+	writer.WriteField("start", s.Commands["start"])
 	part, err := writer.CreateFormFile("file", "upload")
 	if err != nil {
 		return err
@@ -121,6 +124,9 @@ func (s *Service) Update(name, status string) error {
 	err := writer.WriteField("type", status)
 	if err == nil {
 		err = writer.WriteField("path", name)
+		err = writer.WriteField("build", s.Commands["build"])
+		err = writer.WriteField("test", s.Commands["test"])
+		err = writer.WriteField("start", s.Commands["start"])
 	}
 	if err != nil {
 		return err
