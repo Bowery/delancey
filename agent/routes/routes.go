@@ -37,7 +37,11 @@ func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	<-proc.Restart()
+	build := req.FormValue("build")
+	test := req.FormValue("test")
+	start := req.FormValue("start")
+	<-proc.Restart(build, test, start)
+
 	r.JSON(http.StatusOK, map[string]interface{}{"status": "created"})
 }
 
@@ -92,7 +96,11 @@ func HandleUpdateService(r render.Render, res http.ResponseWriter, req *http.Req
 			return
 		}
 
-		<-proc.Restart()
+		build := req.FormValue("build")
+		test := req.FormValue("test")
+		start := req.FormValue("start")
+		<-proc.Restart(build, test, start)
+
 		r.JSON(http.StatusOK, map[string]interface{}{"status": "created"})
 	}
 }
