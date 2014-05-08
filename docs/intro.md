@@ -12,7 +12,7 @@ While developers writing mission critical applications already develop on clones
 Keep your source code on your computer and edit it with your favorite text editor. Crosswalk will detect changes, update the files on the server running your environment, and restart the application. This allows for the optimal development process. The productivity of developing locally, with the quality of assurance of having run your code in the environment you're deploying it to.
 
 ## Architecture
-An agent runs on the server you want to run your code on. It will bind to port 3000 and must be accessible by the command-line interface.
+An agent runs on the server you want to run your code on. It will bind to port 3000 and 3002 and must be accessible by the command-line interface.
 
 The command-line interface runs on the developers computer and will is passed information about where the source code is and how to run it.
 

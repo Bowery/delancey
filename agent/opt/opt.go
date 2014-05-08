@@ -1,5 +1,5 @@
 // Copyright 2014 Bowery, Inc.
-package opts
+package opt
 
 import (
 	"flag"
