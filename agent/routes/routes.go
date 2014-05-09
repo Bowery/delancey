@@ -2,7 +2,7 @@
 package routes
 
 import (
-	"Bowery/crosswalk/agent/opt"
+	"Bowery/crosswalk/agent/opts"
 	"Bowery/crosswalk/agent/proc"
 	"Bowery/crosswalk/agent/tar"
 	"errors"
@@ -27,11 +27,11 @@ func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Reques
 	}
 	defer attach.Close()
 
-	if err = os.MkdirAll(*opt.TargetDir, 0755); err != nil {
+	if err = os.MkdirAll(*opts.TargetDir, 0755); err != nil {
 		r.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 	}
 
-	if err = tar.Untar(attach, *opt.TargetDir); err != nil {
+	if err = tar.Untar(attach, *opts.TargetDir); err != nil {
 		r.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
 	}
@@ -58,7 +58,7 @@ func HandleUpdateService(r render.Render, res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	path = filepath.Join(*opt.TargetDir, path)
+	path = filepath.Join(*opts.TargetDir, path)
 
 	if typ == "delete" {
 		err := os.RemoveAll(path)

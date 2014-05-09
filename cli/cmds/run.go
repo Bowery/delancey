@@ -109,14 +109,28 @@ func runRun(args ...string) int {
 	}()
 
 	// Connect to logs
-	go func() {
-		conn, err := net.Dial("tcp", address+":3002")
-		if err != nil {
-			done <- 1
-		}
-		defer conn.Close()
+	conn, err := net.Dial("tcp", address+":3002")
+	if err != nil {
+		done <- 1
+	}
+	defer conn.Close()
+
+	logChannel := make(chan []byte)
+
+	go func(ch chan []byte) {
 		for {
-			log.Println("red", "logs")
+			data := make([]byte, 512)
+			conn.Read(data)
+			ch <- data
+		}
+	}(logChannel)
+
+	go func() {
+		for {
+			select {
+			case data := <-logChannel:
+				log.Println("", string(data))
+			}
 		}
 	}()
 
