@@ -1,3 +1,4 @@
+// Copyright 2014 Bowery, Inc.
 package opt
 
 import (
@@ -11,6 +12,7 @@ var (
 	TestCmd   = flag.String("test", "", "Command to test application.")
 	BuildCmd  = flag.String("build", "", "Command to build application. Often used to install dependencies. It's always run before the Start Command.")
 	Path      = flag.String("path", ".", "Path to sync files from.")
+	Auth      = flag.String("auth", "", "Password used to authenticate with agent.")
 )
 
 type Option struct {
@@ -30,5 +32,6 @@ func All() []Option {
 		Option{"test", "", "Command to test application."},
 		Option{"build", "", "Command to build application. Often used to install dependencies. It's always run before the Start Command."},
 		Option{"path", ".", "Path to sync files from."},
+		Option{"auth", "", "Password used to authenticate with agent."},
 	}
 }

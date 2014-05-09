@@ -1,4 +1,4 @@
-// Copyright 2013-2014 Bowery, Inc.
+// Copyright 2014 Bowery, Inc.
 package cmds
 
 import (
@@ -30,6 +30,7 @@ func runRun(args ...string) int {
 	path := *opt.Path
 	build := *opt.BuildCmd
 	test := *opt.TestCmd
+	auth := *opt.Auth
 
 	if address == "" || start == "" || build == "" {
 		log.Println("yellow", "A few questions about your app")
@@ -55,6 +56,7 @@ func runRun(args ...string) int {
 			"start": start,
 		},
 		Path: path,
+		Auth: auth,
 	}
 
 	// Attempt to reach server.

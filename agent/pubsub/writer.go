@@ -1,3 +1,4 @@
+// Copyright 2014 Bowery, Inc.
 package pubsub
 
 type NetWriter struct{}

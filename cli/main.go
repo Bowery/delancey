@@ -10,7 +10,6 @@ import (
 
 func main() {
 	// Parse flags and get arguments.
-	flag.Parse()
 	command := "run"
 	commandArgs := flag.Args()
 
