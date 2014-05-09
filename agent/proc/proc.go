@@ -2,6 +2,7 @@
 package proc
 
 import (
+	"Bowery/crosswalk/agent/opts"
 	"os/exec"
 	"strings"
 	"sync"
@@ -29,15 +30,15 @@ func Restart(build, test, start string) chan bool {
 		// Parse commands.
 		if build != "" {
 			buildCmd = parseCommand(build)
-			buildCmd.Dir = "/home/vagrant/application"
+			buildCmd.Dir = *opts.TargetDir
 		}
 		if test != "" {
 			testCmd = parseCommand(test)
-			testCmd.Dir = "/home/vagrant/application"
+			testCmd.Dir = *opts.TargetDir
 		}
 		if start != "" {
 			startCmd = parseCommand(start)
-			startCmd.Dir = "/home/vagrant/application"
+			startCmd.Dir = *opts.TargetDir
 		}
 
 		// Run the build process, and only proceed if successful.

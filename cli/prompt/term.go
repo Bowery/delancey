@@ -2,7 +2,7 @@
 package prompt
 
 import (
-	"Bowery/crosswalk/errors"
+	"Bowery/crosswalk/cli/errors"
 	"bufio"
 	"io"
 )

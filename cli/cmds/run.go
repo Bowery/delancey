@@ -4,19 +4,13 @@ package cmds
 import (
 	"Bowery/crosswalk/cli/log"
 	"Bowery/crosswalk/cli/model"
+	"Bowery/crosswalk/cli/opt"
+	"Bowery/crosswalk/cli/prompt"
 	"Bowery/crosswalk/cli/sync"
-	"cli/prompt"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
-
-	"launchpad.net/goyaml"
 )
-
-type Config struct {
-	Service model.Service
-}
 
 func init() {
 	Cmds["run"] = &Cmd{runRun, "run", "Run the process."}
@@ -29,85 +23,43 @@ func runRun(args ...string) int {
 	signal.Notify(signals, os.Interrupt, os.Kill)
 	defer signal.Stop(signals)
 
-	// Attempt to read in .yaml file.
-	providedFile := true
-	data, err := ioutil.ReadFile("crosswalk.yaml")
-	if err != nil {
-		providedFile = false
-	}
-
 	// Service info.
-	var address, path, build, test, start string
+	address := *opt.AgentAddr
+	start := *opt.StartCmd
+	path := *opt.Path
+	build := *opt.BuildCmd
+	test := *opt.TestCmd
 
-	// Config.
-	var config Config
+	fmt.Println(address, start, path, build, test)
 
-	// If no file provided prompt user for info.
-	if !providedFile {
+	if address == "" || start == "" || build == "" {
 		log.Println("yellow", "A few questions about your app")
-		address, err = prompt.Basic("Address", true)
-		if err != nil {
-			return 1
+		if address == "" {
+			address, _ = prompt.Basic("Address", true)
 		}
 
-		path, err = prompt.BasicDefault("Path", ".")
-		if err != nil {
-			return 1
+		if start == "" {
+			start, _ = prompt.Basic("Start Command", true)
 		}
 
-		build, err = prompt.Basic("Build command", false)
-		if err != nil {
-			return 1
-		}
-
-		test, err = prompt.Basic("Test command", false)
-		if err != nil {
-			return 1
-		}
-
-		start, err = prompt.Basic("Start command", false)
-		if err != nil {
-			return 1
-		}
-
-		config = Config{
-			Service: model.Service{
-				Address: address,
-				Commands: map[string]string{
-					"build": build,
-					"test":  test,
-					"start": start,
-				},
-				Path: path,
-			},
-		}
-
-		// Marshal config.
-		data, err := goyaml.Marshal(config.Service)
-		if err != nil {
-			log.Println("red", fmt.Sprintf("Error: %s", err.Error()))
-			return 1
-		}
-
-		// Write config to .yaml file.
-		if err = ioutil.WriteFile("crosswalk.yaml", data, 0644); err != nil {
-			log.Println("red", fmt.Sprintf("Error: %s", err.Error()))
-			return 1
-		}
-	} else {
-		// Unmarshal .yaml config.
-		if err := goyaml.Unmarshal(data, &config.Service); err != nil {
-			log.Println("yellow", "Invalid YAML.")
-			return 1
+		if build == "" {
+			build, _ = prompt.Basic("Build Command", true)
 		}
 	}
 
-	// Add sync port to service address.
-	service := config.Service
-	service.Address += ":3000"
+	// Create Service
+	service := model.Service{
+		Address: address + ":3000",
+		Commands: map[string]string{
+			"build": build,
+			"test":  test,
+			"start": start,
+		},
+		Path: path,
+	}
 
 	// Attempt to reach server.
-	if err = service.Ping(); err != nil {
+	if err := service.Ping(); err != nil {
 		log.Println("red", err.Error())
 		log.Println("yellow", "Unable to connect to "+service.Address+". Make sure you've entered a valid address")
 		log.Println("yellow", "and that port 3000 is publically accessible.")
@@ -130,7 +82,7 @@ func runRun(args ...string) int {
 
 	// Initiate sync.
 	syncer := sync.NewSyncer()
-	if err = syncer.Watch(service.Path); err != nil {
+	if err := syncer.Watch(service.Path); err != nil {
 		log.Println("red", err.Error())
 		return 1
 	}

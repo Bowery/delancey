@@ -2,6 +2,7 @@
 package routes
 
 import (
+	"Bowery/crosswalk/agent/opts"
 	"Bowery/crosswalk/agent/proc"
 	"Bowery/crosswalk/agent/tar"
 	"errors"
@@ -15,8 +16,6 @@ import (
 
 const httpMaxMem = 32 << 10
 
-var ServiceDir = "/home/vagrant/application"
-
 func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Request) {
 	attach, _, err := req.FormFile("file")
 	if err != nil {
@@ -28,11 +27,11 @@ func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Reques
 	}
 	defer attach.Close()
 
-	if err = os.MkdirAll(ServiceDir, 0755); err != nil {
+	if err = os.MkdirAll(*opts.TargetDir, 0755); err != nil {
 		r.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 	}
 
-	if err = tar.Untar(attach, ServiceDir); err != nil {
+	if err = tar.Untar(attach, *opts.TargetDir); err != nil {
 		r.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
 	}
@@ -59,7 +58,7 @@ func HandleUpdateService(r render.Render, res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	path = filepath.Join(ServiceDir, path)
+	path = filepath.Join(*opts.TargetDir, path)
 
 	if typ == "delete" {
 		err := os.RemoveAll(path)
