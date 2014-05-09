@@ -150,7 +150,7 @@ func (watcher *Watcher) Watch(evChan chan *Event, errChan chan error) {
 				watcher.mutex.RUnlock()
 
 				cmtime := stat.ModTime()
-				if ok && pmtime == cmtime {
+				if ok && pmtime.Equal(cmtime) {
 					log.Debug("Ignoring", status, "event because no change", rel)
 					break
 				}
