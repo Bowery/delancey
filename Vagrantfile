@@ -3,7 +3,7 @@ Vagrant.configure("2") do |config|
   config.vm.box = "hashicorp/precise64"
   config.vm.define "server" do |server|
     server.vm.hostname = "server"
-    server.vm.synced_folder ENV["GOPATH"] + "/src", "/home/vagrant/gocode/src"
+    server.vm.synced_folder "agent", "/agent"
     server.vm.network "private_network", ip: "10.0.0.11"
 
     $script = <<-SCRIPT
