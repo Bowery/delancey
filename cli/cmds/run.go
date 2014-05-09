@@ -8,6 +8,7 @@ import (
 	"Bowery/crosswalk/cli/prompt"
 	"Bowery/crosswalk/cli/sync"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 )
@@ -29,8 +30,6 @@ func runRun(args ...string) int {
 	path := *opt.Path
 	build := *opt.BuildCmd
 	test := *opt.TestCmd
-
-	fmt.Println(address, start, path, build, test)
 
 	if address == "" || start == "" || build == "" {
 		log.Println("yellow", "A few questions about your app")
@@ -105,6 +104,32 @@ func runRun(args ...string) int {
 				if err := service.Update(ev.Path, ev.Status); err != nil {
 					done <- 1
 				}
+			}
+		}
+	}()
+
+	// Connect to logs
+	conn, err := net.Dial("tcp", address+":3002")
+	if err != nil {
+		done <- 1
+	}
+	defer conn.Close()
+
+	logChannel := make(chan []byte)
+
+	go func(ch chan []byte) {
+		for {
+			data := make([]byte, 512)
+			conn.Read(data)
+			ch <- data
+		}
+	}(logChannel)
+
+	go func() {
+		for {
+			select {
+			case data := <-logChannel:
+				log.Println("", string(data))
 			}
 		}
 	}()

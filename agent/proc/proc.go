@@ -2,7 +2,8 @@
 package proc
 
 import (
-	"Bowery/crosswalk/agent/opts"
+	"Bowery/crosswalk/agent/opt"
+	"Bowery/crosswalk/agent/pubsub"
 	"os/exec"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 func Restart(build, test, start string) chan bool {
 	started := make(chan bool, 1)
+	writer := pubsub.NewNetWriter()
 
 	// Kill previous commands
 	if build != "" {
@@ -30,19 +32,21 @@ func Restart(build, test, start string) chan bool {
 		// Parse commands.
 		if build != "" {
 			buildCmd = parseCommand(build)
-			buildCmd.Dir = *opts.TargetDir
+			buildCmd.Dir = *opt.TargetDir
 		}
 		if test != "" {
 			testCmd = parseCommand(test)
-			testCmd.Dir = *opts.TargetDir
+			testCmd.Dir = *opt.TargetDir
 		}
 		if start != "" {
 			startCmd = parseCommand(start)
-			startCmd.Dir = *opts.TargetDir
+			startCmd.Dir = *opt.TargetDir
 		}
 
 		// Run the build process, and only proceed if successful.
 		if buildCmd != nil {
+			buildCmd.Stdout = writer
+			buildCmd.Stderr = writer
 			if err := buildCmd.Run(); err != nil {
 				started <- false
 				return
@@ -52,6 +56,8 @@ func Restart(build, test, start string) chan bool {
 
 		go func() {
 			if testCmd != nil {
+				testCmd.Stdout = writer
+				testCmd.Stderr = writer
 				testCmd.Run()
 			}
 			wg.Done()
@@ -59,6 +65,8 @@ func Restart(build, test, start string) chan bool {
 
 		go func() {
 			if startCmd != nil {
+				startCmd.Stdout = writer
+				startCmd.Stderr = writer
 				started <- true
 				startCmd.Run()
 			} else {

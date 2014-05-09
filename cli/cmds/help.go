@@ -22,5 +22,5 @@ func helpRun(args ...string) int {
 		fmt.Fprintln(tabWriter, "  --"+cmd.Name+"\t"+cmd.Description)
 	}
 	tabWriter.Flush()
-	return 2 // --help uses 2.
+	return 2
 }

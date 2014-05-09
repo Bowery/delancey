@@ -2,6 +2,7 @@
 package main
 
 import (
+	"Bowery/crosswalk/agent/pubsub"
 	"Bowery/crosswalk/agent/routes"
 	"runtime"
 
@@ -23,6 +24,9 @@ func main() {
 	s.Put("/", routes.HandleUpdateService)
 	s.Get("/", routes.HandleGetService)
 	s.Get("/ping", routes.HandlePingService)
+
+	// Start pubsub server.
+	go pubsub.Run()
 
 	// Run Server.
 	s.Run()

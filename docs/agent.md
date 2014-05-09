@@ -31,13 +31,13 @@ sudo service crosswalk restart
 
 
 ## HTTP API
-The crosswalk agent is has a very simple HTTP API that you can easily write applications to integrate with.
+The crosswalk agent has a very simple HTTP API that you can easily write applications to integrate with.
 
 ### POST /
-Creates a new application. It accepts a tar file that it will extract, run build, test, & start.
+Creates a new application. It accepts a tar file that it will extract, and then run build, test, & start commands.
 
 ### PUT /
-Updates a file with the new file, then runs build, test, & start
+Updates a pre-existing file, and then runs build, test, & start commands.
 
 ### GET /ping
-Sends 200 OK if it is alive
+Sends 200 OK if it is alive.
