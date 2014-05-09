@@ -18,7 +18,6 @@ func helpRun(args ...string) int {
 	fmt.Fprintln(os.Stderr, "Usage: crosswalk [options]\n\nOptions:")
 
 	for _, cmd := range opt.All() {
-		// \t is used to separate columns.
 		fmt.Fprintln(tabWriter, "  --"+cmd.Name+"\t"+cmd.Description)
 	}
 	tabWriter.Flush()

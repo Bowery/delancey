@@ -2,7 +2,7 @@
 package routes
 
 import (
-	"Bowery/crosswalk/agent/opts"
+	"Bowery/crosswalk/agent/opt"
 	"Bowery/crosswalk/agent/proc"
 	"Bowery/crosswalk/agent/tar"
 	"errors"
@@ -17,6 +17,11 @@ import (
 const httpMaxMem = 32 << 10
 
 func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Request) {
+	if *opt.Auth != "" && *opt.Auth != req.FormValue("auth") {
+		r.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Incorrect auth key."})
+		return
+	}
+
 	attach, _, err := req.FormFile("file")
 	if err != nil {
 		if err == http.ErrMissingFile {
@@ -27,11 +32,11 @@ func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Reques
 	}
 	defer attach.Close()
 
-	if err = os.MkdirAll(*opts.TargetDir, 0755); err != nil {
+	if err = os.MkdirAll(*opt.TargetDir, 0755); err != nil {
 		r.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 	}
 
-	if err = tar.Untar(attach, *opts.TargetDir); err != nil {
+	if err = tar.Untar(attach, *opt.TargetDir); err != nil {
 		r.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
 	}
@@ -45,6 +50,11 @@ func HandleNewService(r render.Render, res http.ResponseWriter, req *http.Reques
 }
 
 func HandleUpdateService(r render.Render, res http.ResponseWriter, req *http.Request) {
+	if *opt.Auth != "" && *opt.Auth != req.FormValue("auth") {
+		r.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Incorrect auth key."})
+		return
+	}
+
 	if err := req.ParseMultipartForm(httpMaxMem); err != nil {
 		r.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 		return
@@ -58,7 +68,7 @@ func HandleUpdateService(r render.Render, res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	path = filepath.Join(*opts.TargetDir, path)
+	path = filepath.Join(*opt.TargetDir, path)
 
 	if typ == "delete" {
 		err := os.RemoveAll(path)

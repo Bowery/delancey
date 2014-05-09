@@ -23,6 +23,9 @@ type Service struct {
 
 	// Location of files.
 	Path string `path`
+
+	// Auth key for requests.
+	Auth string `auth`
 }
 
 // Ping the service. If the machine is inaccessible
@@ -86,6 +89,9 @@ func (s *Service) Upload() error {
 	writer.WriteField("build", s.Commands["build"])
 	writer.WriteField("test", s.Commands["test"])
 	writer.WriteField("start", s.Commands["start"])
+	if s.Auth != "" {
+		writer.WriteField("auth", s.Auth)
+	}
 	part, err := writer.CreateFormFile("file", "upload")
 	if err != nil {
 		return err
@@ -127,6 +133,9 @@ func (s *Service) Update(name, status string) error {
 		err = writer.WriteField("build", s.Commands["build"])
 		err = writer.WriteField("test", s.Commands["test"])
 		err = writer.WriteField("start", s.Commands["start"])
+		if s.Auth != "" {
+			writer.WriteField("auth", s.Auth)
+		}
 	}
 	if err != nil {
 		return err
