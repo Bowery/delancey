@@ -1,0 +1,14 @@
+dependencies:
+  override:
+    - pip install fabric
+    - pip install requests
+test:
+  override:
+    - mkdir -p /home/ubuntu/.go_workspace/src/github.com/Bowery
+    - cp -r /home/ubuntu/delancey /home/ubuntu/.go_workspace/src/github.com/Bowery/delancey
+    - cd /home/ubuntu/.go_workspace/src/github.com/Bowery/delancey/delancey && go get && go test ./...
+deployment:
+  production:
+    branch: master
+    commands:
+      - fab deploy

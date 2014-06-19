@@ -1,4 +1,3 @@
-cli/crosswalk.yaml
-cli/cli
-agent/agent
+delancey/delancey
 .vagrant
+fabfile.pyc
