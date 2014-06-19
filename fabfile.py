@@ -15,7 +15,7 @@ def restart():
   local_username = run('echo $(whoami)')
   local_path = '/home/' + local_username
   go_path = local_path + '/gocode'
-  project_path = go_path + '/src/github.com/' + project
+  project_path = go_path + '/src/github.com/Bowery/' + project
 
   sudo('mkdir -p ' + project_path)
   with cd(project_path):
