@@ -8,6 +8,7 @@ hosts = [
   'ubuntu@ec2-54-205-254-102.compute-1.amazonaws.com'
 ]
 env.key_filename = '/home/ubuntu/.ssh/id_aws'
+env.key_filename = '/Users/steve/.ssh/bowery.pem'
 env.password = 'java$cript'
 
 @parallel
@@ -20,6 +21,15 @@ def restart():
   sudo('mkdir -p ' + project_path)
   with cd(project_path):
     run('git pull')
+    with cd('delancey'):
+      sudo('GOPATH=' + go_path + ' go get -d')
+      sudo('GOPATH=' + go_path + ' go build')
+      # sudo('mv delancey satellite')
+      # sudo('cp -f satellite ' + project_path + '/images/bowery/')
+      # sudo('rm -rf /satellite/*')
+      # sudo('cp -rf ' + project_path + '/images/bowery/* /satellite/')
+      # sudo('chown ' + local_username + ':' +local_username + ' /satellite/satellite')
+
 
 def deploy():
   execute(restart, hosts=hosts)
