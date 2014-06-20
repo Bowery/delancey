@@ -7,8 +7,7 @@ hosts = [
   'bowery@64.71.188.179',
   'ubuntu@ec2-54-205-254-102.compute-1.amazonaws.com'
 ]
-# env.key_filename = '/home/ubuntu/.ssh/id_aws'
-env.key_filename = '/Users/steve/.ssh/bowery.pem'
+env.key_filename = '/home/ubuntu/.ssh/id_aws'
 env.password = 'java$cript'
 
 @parallel
