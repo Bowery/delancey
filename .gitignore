@@ -1,4 +1,6 @@
 delancey/delancey
+delancey/test/application/http_test.go
 images/bowery/satellite
+monitor/monitor
 .vagrant
 fabfile.pyc

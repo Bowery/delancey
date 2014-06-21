@@ -28,6 +28,11 @@ def restart():
       sudo('rm -rf /satellite/*')
       sudo('cp -rf ' + project_path + '/images/bowery/* /satellite/')
       sudo('chown ' + local_username + ':' +local_username + ' /satellite/satellite')
+    with cd('monitor')
+      sudo('GOPATH=' + go_path + ' go get -d')
+      sudo('GOPATH=' + go_path + ' go build')
+      sudo('mv monitor /usr/local/bin/mss')
+      sudo('restart mss')
 
 
 def deploy():
