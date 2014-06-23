@@ -3,11 +3,9 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -47,8 +45,7 @@ func GetApplication() (*Application, error) {
 	return data.Application, nil
 }
 
-// SetEnv setsthe service environment variables and writes them to a
-// .htaccess file.
+// SetEnv sets the service environment variables.
 func SetEnv(services []*Service) error {
 	envs := make(map[string]string)
 
@@ -77,59 +74,7 @@ func SetEnv(services []*Service) error {
 		}
 	}
 
-	// Read from htaccess.
-	lines := make([]string, 0)
-	found := make([]string, 0)
-	htaccess, err := os.Open(filepath.Join(ServiceDir, ".htaccess"))
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	if htaccess != nil {
-		// Read lines, and replace vars with new address.
-		scanner := bufio.NewScanner(htaccess)
-		for scanner.Scan() {
-			line := scanner.Text()
-
-			// Check if the line is an env var we set.
-			for name, val := range envs {
-				if strings.Contains(line, "SetEnv "+name+" ") {
-					line = "SetEnv " + name + " " + val
-					found = append(found, name)
-					break
-				}
-			}
-
-			lines = append(lines, line)
-		}
-		err = scanner.Err()
-		if err != nil {
-			return err
-		}
-
-		err = htaccess.Close()
-		if err != nil {
-			return err
-		}
-	}
-
-	// Append new vars to the lines.
-	for _, name := range found {
-		delete(envs, name)
-	}
-	for name, val := range envs {
-		lines = append(lines, "SetEnv "+name+" "+val)
-	}
-	// Write the lines back to htaccess.
-	data := []byte(strings.Join(lines, "\n") + "\n")
-	htaccess, err = os.Create(filepath.Join(ServiceDir, ".htaccess"))
-	if err != nil {
-		return err
-	}
-	defer htaccess.Close()
-
-	_, err = htaccess.Write(data)
-	return err
+	return nil
 }
 
 // Retry a function until it passes or reaches a given limit.
