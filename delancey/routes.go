@@ -70,7 +70,7 @@ func NewServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	test := req.FormValue("test")
 	start := req.FormValue("start")
 
-	<-Restart(true, init, build, test, start)
+	<-Restart(true, true, init, build, test, start)
 	res.Body["status"] = "created"
 	res.Send(http.StatusOK)
 }
@@ -174,7 +174,7 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	test := req.FormValue("test")
 	start := req.FormValue("start")
 
-	<-Restart(false, init, build, test, start)
+	<-Restart(false, true, init, build, test, start)
 	res.Body["status"] = "updated"
 	res.Send(http.StatusOK)
 }
@@ -232,7 +232,7 @@ func UpdateServicesHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	<-Restart(true, "", "", "", "")
+	<-Restart(true, false, "", "", "", "")
 	res.Body["status"] = "updated"
 	res.Send(http.StatusOK)
 }
