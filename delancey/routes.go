@@ -64,7 +64,13 @@ func NewServiceHandler(rw http.ResponseWriter, req *http.Request) {
 		res.Send(http.StatusInternalServerError)
 		return
 	}
-	<-Restart(true)
+
+	init := req.FormValue("init")
+	build := req.FormValue("build")
+	test := req.FormValue("test")
+	start := req.FormValue("start")
+
+	<-Restart(true, true, init, build, test, start)
 	res.Body["status"] = "created"
 	res.Send(http.StatusOK)
 }
@@ -163,7 +169,12 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	<-Restart(false)
+	init := req.FormValue("init")
+	build := req.FormValue("build")
+	test := req.FormValue("test")
+	start := req.FormValue("start")
+
+	<-Restart(false, true, init, build, test, start)
 	res.Body["status"] = "updated"
 	res.Send(http.StatusOK)
 }
@@ -221,7 +232,7 @@ func UpdateServicesHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	<-Restart(true)
+	<-Restart(true, false, "", "", "", "")
 	res.Body["status"] = "updated"
 	res.Send(http.StatusOK)
 }
