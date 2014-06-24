@@ -19,7 +19,7 @@ var (
 // Restart restarts the current service process. A channel is returned
 // and signaled when the process is started, or when the build fails.
 // The init command is only restarted if hard is true.
-func Restart(hard bool, init, build, test, start string) chan bool {
+func Restart(hard bool) chan bool {
 	fmt.Println("Restarting")
 	started := make(chan bool, 1)
 
@@ -48,12 +48,15 @@ func Restart(hard bool, init, build, test, start string) chan bool {
 	}
 	if hard && currentInitCmd != "" {
 		exec.Command("pkill", "-f", currentInitCmd).Run()
-		currentInitCmd = init
 	}
 
-	currentBuildCmd = build
-	currentTestCmd = test
-	currentStartCmd = start
+	// Store cmd strings for later restarts.
+	currentBuildCmd = service.Build
+	currentTestCmd = service.Test
+	currentStartCmd = service.Start
+	if hard {
+		currentInitCmd = service.Init
+	}
 
 	// Run processes in goroutine so channel reads can occur before the commands
 	// are finished.
@@ -63,10 +66,10 @@ func Restart(hard bool, init, build, test, start string) chan bool {
 		defer redis.Close()
 
 		// Parse commands.
-		buildCmd := parseCommand(currentBuildCmd, redis)
-		testCmd := parseCommand(currentTestCmd, redis)
-		startCmd := parseCommand(currentStartCmd, redis)
-		initCmd := parseCommand(currentInitCmd, redis)
+		buildCmd := parseCommand(service.Build, redis)
+		testCmd := parseCommand(service.Test, redis)
+		startCmd := parseCommand(service.Start, redis)
+		initCmd := parseCommand(service.Init, redis)
 
 		// Run the build process, and only proceed if successful.
 		if buildCmd != nil {
