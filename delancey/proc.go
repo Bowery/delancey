@@ -19,7 +19,7 @@ var (
 // Restart restarts the current service process. A channel is returned
 // and signaled when the process is started, or when the build fails.
 // The init command is only restarted if hard is true.
-func Restart(hard, resetCommands bool, init, build, test, start string) chan bool {
+func Restart(hard bool, init, build, test, start string) chan bool {
 	fmt.Println("Restarting")
 	started := make(chan bool, 1)
 
@@ -48,16 +48,12 @@ func Restart(hard, resetCommands bool, init, build, test, start string) chan boo
 	}
 	if hard && currentInitCmd != "" {
 		exec.Command("pkill", "-f", currentInitCmd).Run()
-		if resetCommands {
-			currentInitCmd = init
-		}
+		currentInitCmd = init
 	}
 
-	if resetCommands {
-		currentBuildCmd = build
-		currentTestCmd = test
-		currentStartCmd = start
-	}
+	currentBuildCmd = build
+	currentTestCmd = test
+	currentStartCmd = start
 
 	// Run processes in goroutine so channel reads can occur before the commands
 	// are finished.
