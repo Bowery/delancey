@@ -12,16 +12,16 @@ import (
 )
 
 const (
-	VERSION = "1.0.0"
+	VERSION = "1.0.0" // current monitor version
 )
 
 var (
-	system          *SystemInfo
-	apiUrl          string
-	host            = os.Getenv("HOST")
-	api             = os.Getenv("API")
-	env             = os.Getenv("ENV")
-	engTeamContacts = []string{
+	system          *SystemInfo         // host system info.
+	apiUrl          string              // api address.
+	host            = os.Getenv("HOST") // host address.
+	api             = os.Getenv("API")  // api address.
+	env             = os.Getenv("ENV")  // mode to run in.
+	engTeamContacts = []string{         // phone numbers of team.
 		"+17814924545",
 	}
 )
@@ -41,7 +41,12 @@ func main() {
 	// Update API with stats.
 	go updateAPIWithStats()
 
-	// Check Docker.
+	// Check to see if Docker is installed.
+	// Exit if it is not.
+	if !isDockerInstalled() {
+		log.Fatal("Docker is not installed.")
+	}
+
 	go checkDocker()
 
 	// Run server.
@@ -102,6 +107,8 @@ func updateAPIWithStats() {
 	}
 }
 
+// Run, inspect, and destroy containers every minute
+// to verify that Docker is operational.
 func checkDocker() {
 	for {
 		<-time.After(1 * time.Minute)
