@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	sampleService *service       // sample Bowery service
-	dockerClient  *docker.Client // client for docker remote agent
+	sampleService *service       // sample Bowery service.
+	dockerClient  *docker.Client // client for docker remote agent.
 )
 
 func init() {
@@ -46,6 +46,17 @@ func CheckDocker() error {
 	}
 
 	return nil
+}
+
+// Check to see that the docker client is working
+// as expected. If docker.Client.Info() returns an
+// error, it is not running properly.
+func isDockerInstalled() bool {
+	_, err := dockerClient.Info()
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // Build a new container, using a Bowery service
