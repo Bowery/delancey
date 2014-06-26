@@ -50,6 +50,10 @@ func NewServiceHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer attach.Close()
+	init := req.FormValue("init")
+	build := req.FormValue("build")
+	test := req.FormValue("test")
+	start := req.FormValue("start")
 
 	err = Untar(attach, ServiceDir)
 	if err != nil {
@@ -64,7 +68,8 @@ func NewServiceHandler(rw http.ResponseWriter, req *http.Request) {
 		res.Send(http.StatusInternalServerError)
 		return
 	}
-	<-Restart(true)
+
+	<-Restart(true, true, init, build, test, start)
 	res.Body["status"] = "created"
 	res.Send(http.StatusOK)
 }
@@ -81,6 +86,10 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	path := req.FormValue("path")
 	typ := req.FormValue("type")
 	modeStr := req.FormValue("mode")
+	init := req.FormValue("init")
+	build := req.FormValue("build")
+	test := req.FormValue("test")
+	start := req.FormValue("start")
 
 	if path == "" || typ == "" {
 		res.Body["error"] = ErrMissingFields.Error()
@@ -153,17 +162,7 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// If updating .htaccess, update the env.
-	if path == filepath.Join(ServiceDir, ".htaccess") {
-		err = ServiceList()
-		if err != nil {
-			res.Body["error"] = err.Error()
-			res.Send(http.StatusInternalServerError)
-			return
-		}
-	}
-
-	<-Restart(false)
+	<-Restart(false, true, init, build, test, start)
 	res.Body["status"] = "updated"
 	res.Send(http.StatusOK)
 }
@@ -221,7 +220,7 @@ func UpdateServicesHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	<-Restart(true)
+	<-Restart(true, false, "", "", "", "")
 	res.Body["status"] = "updated"
 	res.Send(http.StatusOK)
 }

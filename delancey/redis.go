@@ -29,23 +29,23 @@ func NewRedis() *Redis {
 
 // Write implements io.Writer writing logs.
 func (redis *Redis) Write(b []byte) (int, error) {
-	return len(b), redis.WriteLogs(ApplicationID, ServiceName, b)
+	return len(b), redis.WriteLogs(b)
 }
 
 // WriteLogs publishes data to an application.
-func (redis *Redis) WriteLogs(appId, serviceName string, data []byte) error {
+func (redis *Redis) WriteLogs(data []byte) error {
 	conn := redis.pool.Get()
 	defer conn.Close()
 
-	return conn.Send("PUBLISH", "logs:"+appId, serviceName+": "+string(data))
+	return conn.Send("PUBLISH", "logs:"+ApplicationID, ServiceName+": "+string(data))
 }
 
 // UpdateState updates the current state for an applications service.
-func (redis *Redis) UpdateState(appId, serviceName, state string) error {
+func (redis *Redis) UpdateState(state string) error {
 	conn := redis.pool.Get()
 	defer conn.Close()
 
-	return conn.Send("PUBLISH", "state:"+appId+":"+serviceName+": "+state)
+	return conn.Send("PUBLISH", "state:"+ApplicationID+":"+ServiceName+": "+state)
 }
 
 // Close closes the redis pool.
