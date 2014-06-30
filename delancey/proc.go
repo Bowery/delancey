@@ -14,11 +14,41 @@ import (
 var (
 	ImageScriptsDir = "/image_scripts"
 	mutex           sync.Mutex
+	cmdStrs         = [4]string{} // Order: init, build, test start.
 	// Only assign here if the process has been started.
 	prevInitCmd *exec.Cmd
-	cmds        = make([]*exec.Cmd, 0)
-	cmdStrs     = [4]string{} // Order: init, build, test start.
 )
+
+// Proc describes a processes ids and its children.
+type Proc struct {
+	Pid      int
+	Ppid     int
+	Children []*Proc
+}
+
+// Kill kills the proc and its children.
+func (proc *Proc) Kill() error {
+	p, err := os.FindProcess(proc.Pid)
+	if err != nil {
+		return err
+	}
+
+	err = p.Kill()
+	if err != nil {
+		return err
+	}
+
+	if proc.Children != nil {
+		for _, p := range proc.Children {
+			err = p.Kill()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
 
 // Restart restarts the services processes, the init cmd is only restarted
 // if initReset is true. Commands to run are only updated if reset is true.
@@ -29,7 +59,13 @@ func Restart(initReset, reset bool, init, build, test, start string) chan bool {
 	redis := NewRedis()
 	fmt.Println("Restarting")
 
-	killCmds(initReset)
+	err := killCmds(initReset)
+	if err != nil {
+		mutex.Unlock()
+		redis.Close()
+		finish <- false
+		return finish
+	}
 
 	// Create cmds.
 	if reset {
@@ -51,6 +87,7 @@ func Restart(initReset, reset bool, init, build, test, start string) chan bool {
 		defer redis.Close()
 		defer wg.Wait()
 		defer mutex.Unlock()
+		cmds := make([]*exec.Cmd, 0)
 
 		// Get the image_scripts and start them.
 		scriptPath := filepath.Join(ImageScriptsDir)
@@ -119,22 +156,22 @@ func Restart(initReset, reset bool, init, build, test, start string) chan bool {
 
 		// Signal the start and prepare the wait group to keep redis open.
 		finish <- true
-		wg.Add(len(cmds) + 1)
+		wg.Add(len(cmds))
 
 		// Wait for the init process to end
-		go func() {
-			if initReset && prevInitCmd != nil {
-				waitProc(prevInitCmd, redis)
-			}
+		if initReset && prevInitCmd != nil {
+			wg.Add(1)
 
-			wg.Done()
-		}()
+			go func(c *exec.Cmd) {
+				waitProc(c, redis)
+				wg.Done()
+			}(prevInitCmd)
+		}
 
 		// Loop the commands and wait for them in parallel.
 		for _, cmd := range cmds {
 			go func(c *exec.Cmd) {
 				waitProc(c, redis)
-
 				wg.Done()
 			}(cmd)
 		}
@@ -165,49 +202,30 @@ func startProc(cmd *exec.Cmd, redis *Redis) error {
 
 // killCmds kills the running processes and resets them, the init cmd
 // is only killed if init is true.
-func killCmds(init bool) {
-	// Get the pids and filter out the services pids.
-	pids, _ := FindPidsByPgid(os.Getpid())
-	for i, pid := range pids {
-		for _, cmd := range cmds {
-			if cmd.Process != nil && cmd.Process.Pid == pid {
-				pids[i] = -1
+func killCmds(init bool) error {
+	proc, err := GetPidTree(os.Getpid())
+	if err != nil {
+		return nil
+	}
+
+	for _, proc := range proc.Children {
+		// Manage the previous init command properly.
+		if prevInitCmd != nil && prevInitCmd.Process != nil &&
+			prevInitCmd.Process.Pid == proc.Pid {
+			if init {
+				prevInitCmd = nil
+			} else {
 				continue
 			}
 		}
 
-		if prevInitCmd != nil && prevInitCmd.Process != nil &&
-			prevInitCmd.Process.Pid == pid {
-			pids[i] = -1
+		err = proc.Kill()
+		if err != nil {
+			return err
 		}
 	}
 
-	// Kill the service pids.
-	for _, cmd := range cmds {
-		if cmd.Process != nil {
-			cmd.Process.Kill()
-		}
-	}
-	cmds = make([]*exec.Cmd, 0)
-	if init {
-		if prevInitCmd != nil && prevInitCmd.Process != nil {
-			prevInitCmd.Process.Kill()
-		}
-
-		prevInitCmd = nil
-	}
-
-	// Kill the rest of the found pids.
-	for _, pid := range pids {
-		if pid <= -1 {
-			continue
-		}
-
-		proc, err := os.FindProcess(pid)
-		if err == nil {
-			proc.Kill()
-		}
-	}
+	return nil
 }
 
 // parseCmd converts a string to a command, connecting stdio to a
