@@ -3,40 +3,89 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strconv"
-	"syscall"
 )
 
-// FindPidsByPgid gets a list of pids that have a pgid that matches the given
-// pgid. It excludes pids that match the pgid.
-func FindPidsByPgid(pgid int) ([]int, error) {
-	pids := make([]int, 0)
-	proc, err := os.Open("/proc")
+// GetPidTree gets the processes tree.
+func GetPidTree(cpid int) (*Proc, error) {
+	ppid, err := getPpid(cpid)
 	if err != nil {
-		return pids, err
+		return nil, err
 	}
-	defer proc.Close()
+	proc := &Proc{Pid: cpid, Ppid: ppid, Children: make([]*Proc, 0)}
 
-	names, err := proc.Readdirnames(0)
+	pids, err := pidList()
 	if err != nil {
-		return pids, err
+		return nil, err
 	}
 
-	for _, name := range names {
-		pid, err := strconv.Atoi(name)
-		if err != nil || pid == pgid {
+	for _, pid := range pids {
+		if pid == cpid {
 			continue
 		}
 
-		ppgid, err := syscall.Getpgid(pid)
+		ppid, err := getPpid(pid)
 		if err != nil {
 			return nil, err
 		}
 
-		if ppgid == pgid {
-			pids = append(pids, pid)
+		if ppid == cpid {
+			p, err := GetPidTree(pid)
+			if err != nil {
+				return nil, err
+			}
+
+			proc.Children = append(proc.Children, p)
 		}
+	}
+
+	return proc, nil
+}
+
+// Get the ppid for a pid.
+func getPpid(pid int) (int, error) {
+	var (
+		comm  string
+		state byte
+		ppid  int
+	)
+
+	stat, err := os.Open("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return 0, err
+	}
+	defer stat.Close()
+
+	_, err = fmt.Fscanf(stat, "%d %s %c %d", &pid, &comm, &state, &ppid)
+	if err != nil {
+		return 0, err
+	}
+
+	return ppid, nil
+}
+
+// pidList retrieves all the pids.
+func pidList() ([]int, error) {
+	procfs, err := os.Open("/proc")
+	if err != nil {
+		return nil, err
+	}
+
+	names, err := procfs.Readdirnames(0)
+	if err != nil {
+		return nil, err
+	}
+
+	pids := make([]int, 0)
+	for _, name := range names {
+		pid, err := strconv.Atoi(name)
+		if err != nil {
+			continue
+		}
+
+		pids = append(pids, pid)
 	}
 
 	return pids, nil
