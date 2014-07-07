@@ -21,7 +21,7 @@ var ServiceDir = "/application"
 
 // List of named routes.
 var Routes = []*Route{
-	&Route{"/", []string{"POST"}, NewServiceHandler},
+	&Route{"/", []string{"POST"}, UploadServiceHandler},
 	&Route{"/", []string{"PUT"}, UpdateServiceHandler},
 	&Route{"/", []string{"GET"}, GetServiceHandler},
 	&Route{"/", []string{"DELETE"}, RemoveServiceHandler},
@@ -36,30 +36,29 @@ type Route struct {
 	Handler http.HandlerFunc
 }
 
-// POST /, Upload new service.
-func NewServiceHandler(rw http.ResponseWriter, req *http.Request) {
+// POST /, Upload service code running init steps.
+func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	res := NewResponder(rw, req)
 	attach, _, err := req.FormFile("file")
-	if err != nil {
-		if err == http.ErrMissingFile {
-			err = ErrMissingFields
-		}
-
+	if err != nil && err != http.ErrMissingFile {
 		res.Body["error"] = err.Error()
 		res.Send(http.StatusBadRequest)
 		return
 	}
-	defer attach.Close()
 	init := req.FormValue("init")
 	build := req.FormValue("build")
 	test := req.FormValue("test")
 	start := req.FormValue("start")
 
-	err = Untar(attach, ServiceDir)
-	if err != nil {
-		res.Body["error"] = err.Error()
-		res.Send(http.StatusInternalServerError)
-		return
+	if attach != nil {
+		defer attach.Close()
+
+		err = Untar(attach, ServiceDir)
+		if err != nil {
+			res.Body["error"] = err.Error()
+			res.Send(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	err = ServiceList()

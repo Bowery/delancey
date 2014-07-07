@@ -70,10 +70,10 @@ func init() {
 	}
 }
 
-func TestNewSuccess(t *testing.T) {
+func TestUploadWithFile(t *testing.T) {
 	apiServer := getApiServer()
 	defer apiServer.Close()
-	server := httptest.NewServer(http.HandlerFunc(NewServiceHandler))
+	server := httptest.NewServer(http.HandlerFunc(UploadServiceHandler))
 	defer server.Close()
 
 	req, err := newUploadRequest(server.URL, map[string]string{
@@ -101,13 +101,13 @@ func TestNewSuccess(t *testing.T) {
 	}
 }
 
-func TestNewNonTar(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(NewServiceHandler))
+func TestUploadNoFile(t *testing.T) {
+	apiServer := getApiServer()
+	defer apiServer.Close()
+	server := httptest.NewServer(http.HandlerFunc(UploadServiceHandler))
 	defer server.Close()
 
-	req, err := newUploadRequest(server.URL, map[string]string{
-		"file": "http_test.go",
-	}, nil)
+	req, err := newUploadRequest(server.URL, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,16 +125,23 @@ func TestNewNonTar(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if response.Status != "failed" {
-		t.Error("Response should have failed, but didn't.")
+	if response.Status == "failed" {
+		t.Error(response.Err)
 	}
 }
 
-func TestNewNoUpload(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(NewServiceHandler))
+func TestUploadNonTar(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(UploadServiceHandler))
 	defer server.Close()
 
-	res, err := http.PostForm(server.URL, make(url.Values))
+	req, err := newUploadRequest(server.URL, map[string]string{
+		"file": "http_test.go",
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +197,12 @@ func TestUpdateNoFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(UpdateServiceHandler))
 	defer server.Close()
 
-	res, err := http.PostForm(server.URL, make(url.Values))
+	req, err := newUploadRequest(server.URL, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,11 +224,15 @@ func TestUpdateNoUpload(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(UpdateServiceHandler))
 	defer server.Close()
 
-	fields := make(url.Values)
-	fields.Set("type", "update")
-	fields.Set("path", "http_test.go")
+	req, err := newUploadRequest(server.URL, nil, map[string]string{
+		"type": "update",
+		"path": "http_test.go",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	res, err := http.PostForm(server.URL, fields)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,11 +256,15 @@ func TestDeleteSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(UpdateServiceHandler))
 	defer server.Close()
 
-	fields := make(url.Values)
-	fields.Set("type", "delete")
-	fields.Set("path", "http_test.go")
+	req, err := newUploadRequest(server.URL, nil, map[string]string{
+		"type": "delete",
+		"path": "http_test.go",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	res, err := http.PostForm(server.URL, fields)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
