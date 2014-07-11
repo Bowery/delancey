@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	// "io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ const httpMaxMem = 32 << 10
 
 // Directory the service lives in.
 var ServiceDir = "/application"
+var LastServiceDir = "/application" // so we can cleanup after ourselves
 
 // List of named routes.
 var Routes = []*Route{
@@ -49,6 +51,20 @@ func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	build := req.FormValue("build")
 	test := req.FormValue("test")
 	start := req.FormValue("start")
+
+	path := req.FormValue("path")
+
+	pathList := strings.Split(path, ":")
+	// If target path is specified and path has changed.
+	if len(pathList) == 2 && ServiceDir != pathList[1] {
+		ServiceDir = pathList[1]
+		if err := os.RemoveAll(LastServiceDir); err != nil {
+			res.Body["error"] = err.Error()
+			res.Send(http.StatusInternalServerError)
+			return
+		}
+		LastServiceDir = ServiceDir
+	}
 
 	if attach != nil {
 		defer attach.Close()
@@ -89,6 +105,8 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	build := req.FormValue("build")
 	test := req.FormValue("test")
 	start := req.FormValue("start")
+
+	// Update Service Dir if necessary
 
 	if path == "" || typ == "" {
 		res.Body["error"] = ErrMissingFields.Error()
