@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	// "io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,13 +51,13 @@ func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	build := req.FormValue("build")
 	test := req.FormValue("test")
 	start := req.FormValue("start")
-
 	path := req.FormValue("path")
-
 	pathList := strings.Split(path, ":")
-	root := pathList[1]
+
 	// If target path is specified and path has changed.
-	if len(pathList) == 2 && ServiceDir != root {
+	if len(pathList) == 2 && ServiceDir != pathList[1] {
+		root := pathList[1]
+		fmt.Println("root", root)
 		if string(root[0]) == "~" {
 			root = HomeDir + string(root[1:])
 		}
@@ -66,6 +65,7 @@ func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 			root = HomeDir + root
 		}
 		ServiceDir = root
+		fmt.Println("before/after", ServiceDir, LastServiceDir)
 		if err := os.RemoveAll(LastServiceDir); err != nil {
 			res.Body["error"] = err.Error()
 			res.Send(http.StatusInternalServerError)
@@ -113,8 +113,6 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	build := req.FormValue("build")
 	test := req.FormValue("test")
 	start := req.FormValue("start")
-
-	// Update Service Dir if necessary
 
 	if path == "" || typ == "" {
 		res.Body["error"] = ErrMissingFields.Error()
