@@ -18,6 +18,7 @@ import (
 const httpMaxMem = 32 << 10
 
 // Directory the service lives in.
+var HomeDir = "/root/" // default for ubuntu docker container
 var ServiceDir = "/application"
 var LastServiceDir = "/application" // so we can cleanup after ourselves
 
@@ -55,9 +56,16 @@ func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	path := req.FormValue("path")
 
 	pathList := strings.Split(path, ":")
+	root := pathList[1]
 	// If target path is specified and path has changed.
-	if len(pathList) == 2 && ServiceDir != pathList[1] {
-		ServiceDir = pathList[1]
+	if len(pathList) == 2 && ServiceDir != root {
+		if string(root[0]) == "~" {
+			root = HomeDir + string(root[1:])
+		}
+		if string(root[0]) != "/" {
+			root = HomeDir + root
+		}
+		ServiceDir = root
 		if err := os.RemoveAll(LastServiceDir); err != nil {
 			res.Body["error"] = err.Error()
 			res.Send(http.StatusInternalServerError)
