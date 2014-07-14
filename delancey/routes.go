@@ -19,7 +19,6 @@ const httpMaxMem = 32 << 10
 // Directory the service lives in.
 var HomeDir = "/root/" // default for ubuntu docker container
 var ServiceDir = "/application"
-var LastServiceDir = "/application" // so we can cleanup after ourselves
 
 // List of named routes.
 var Routes = []*Route{
@@ -57,21 +56,33 @@ func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	// If target path is specified and path has changed.
 	if len(pathList) == 2 && ServiceDir != pathList[1] {
 		root := pathList[1]
-		fmt.Println("root", root)
 		if string(root[0]) == "~" {
 			root = HomeDir + string(root[1:])
 		}
 		if string(root[0]) != "/" {
 			root = HomeDir + root
 		}
-		ServiceDir = root
-		fmt.Println("before/after", ServiceDir, LastServiceDir)
-		if err := os.RemoveAll(LastServiceDir); err != nil {
+		if err := os.Chdir("/"); err != nil {
 			res.Body["error"] = err.Error()
 			res.Send(http.StatusInternalServerError)
 			return
 		}
-		LastServiceDir = ServiceDir
+		if err := os.RemoveAll(ServiceDir); err != nil {
+			res.Body["error"] = err.Error()
+			res.Send(http.StatusInternalServerError)
+			return
+		}
+		err := os.MkdirAll(root, os.ModePerm|os.ModeDir)
+		if err == nil {
+			err = os.Chdir(root)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			res.Body["error"] = err.Error()
+			res.Send(http.StatusInternalServerError)
+			return
+		}
+		ServiceDir = root
 	}
 
 	if attach != nil {
