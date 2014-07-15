@@ -53,11 +53,16 @@ func (proc *Proc) Kill() error {
 // Restart restarts the services processes, the init cmd is only restarted
 // if initReset is true. Commands to run are only updated if reset is true.
 // A channel is returned and signaled if the commands start or the build fails.
-func Restart(initReset, reset bool, init, build, test, start string) chan bool {
+func Restart(initReset, reset bool, init, build, test, start string, env map[string]string) chan bool {
 	mutex.Lock() // Lock here so no other restarts can interfere.
 	finish := make(chan bool, 1)
 	redis := NewRedis()
 	fmt.Println("Restarting")
+
+	// Set ENV
+	for k, v := range env {
+		os.Setenv(k, v)
+	}
 
 	err := killCmds(initReset)
 	if err != nil {
@@ -75,10 +80,11 @@ func Restart(initReset, reset bool, init, build, test, start string) chan bool {
 
 		cmdStrs = [4]string{init, build, test, start}
 	}
+
+	initCmd := parseCmd(cmdStrs[0], redis)
 	buildCmd := parseCmd(cmdStrs[1], redis)
 	testCmd := parseCmd(cmdStrs[2], redis)
 	startCmd := parseCmd(cmdStrs[3], redis)
-	initCmd := parseCmd(cmdStrs[0], redis)
 
 	// Run in goroutine so commands can run in the background with the redis
 	// connection open.

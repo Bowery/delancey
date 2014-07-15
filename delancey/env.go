@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Bowery/gopackages/schemas"
 )
 
 // ServiceList retrieves the list of services for the application, and
@@ -22,7 +24,7 @@ func ServiceList() error {
 }
 
 // GetApplication retrieves the application.
-func GetApplication() (*Application, error) {
+func GetApplication() (*schemas.Application, error) {
 	res, err := http.Get(BasePath + "/" + APIApplicationPath)
 	if err != nil {
 		return nil, err
@@ -46,7 +48,7 @@ func GetApplication() (*Application, error) {
 }
 
 // SetEnv sets the service environment variables.
-func SetEnv(services []*Service) error {
+func SetEnv(services []*schemas.Service) error {
 	envs := make(map[string]string)
 
 	// Get the env names and values.
