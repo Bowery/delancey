@@ -4,6 +4,8 @@ package main
 
 import (
 	"os"
+
+	"github.com/Bowery/gopackages/schemas"
 )
 
 var (
@@ -37,10 +39,10 @@ func init() {
 
 // API is a single request body or response from api.
 type API struct {
-	Status      string       `json:"status"`
-	Application *Application `json:"application"`
-	Services    []*Service   `json:"services"`
-	Err         string       `json:"error"`
+	Status      string               `json:"status"`
+	Application *schemas.Application `json:"application"`
+	Services    []*schemas.Service   `json:"services"`
+	Err         string               `json:"error"`
 }
 
 // Error returns the error message from the response.

@@ -14,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/Bowery/gopackages/schemas"
 )
 
 func init() {
@@ -312,11 +314,16 @@ func TestServicesSuccess(t *testing.T) {
 
 	var body bytes.Buffer
 	encoder := json.NewEncoder(&body)
-	err := encoder.Encode(API{Services: []*Service{{
+	err := encoder.Encode(API{Services: []*schemas.Service{{
+		"",
 		"test",
 		"1.2.3.4",
+		"",
+		"",
+		"",
+		"",
 		map[string]string{"27017": "1.2.3.4:27017"},
-		"", "", "", "",
+		"", "", "", "", map[string]string{"ENV": "development"}, "",
 	}}})
 	if err != nil {
 		t.Fatal(err)
@@ -394,13 +401,13 @@ func getApiServer() *httptest.Server {
 
 // getAppHandler acts as the api route to retrieve an application.
 func getAppHandler(rw http.ResponseWriter, req *http.Request) {
-	services := []*Service{
+	services := []*schemas.Service{
 		{Name: ServiceName},
 	}
 
 	body, _ := json.Marshal(API{
 		Status: "found",
-		Application: &Application{
+		Application: &schemas.Application{
 			ID:       ApplicationID,
 			Services: services,
 		},
