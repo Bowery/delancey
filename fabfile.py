@@ -21,7 +21,7 @@ def restart():
   with cd(project_path):
     run('git pull')
     with cd('delancey'):
-      sudo('git clone git@github.com:Bowery/gopackages ' + gopath + '/src/github.com/Bowery/gopackages')
+      sudo('git clone git@github.com:Bowery/gopackages ' + go_path + '/src/github.com/Bowery/gopackages')
       sudo('GOPATH=' + go_path + ' go get -d')
       sudo('GOPATH=' + go_path + ' go build')
       sudo('mv delancey satellite')
