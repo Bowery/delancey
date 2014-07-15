@@ -17,8 +17,8 @@ def restart():
   go_path = local_path + '/gocode'
   project_path = go_path + '/src/github.com/Bowery/' + project
 
-  with cd(go_path + '/src/github.com/Bowery'):
-    sudo('git clone git@github.com:Bowery/gopackages')
+  with cd(go_path + '/src/github.com/Bowery/gopackages'):
+    run('git pull')
 
   sudo('mkdir -p ' + project_path)
   with cd(project_path):
