@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/Bowery/gopackages/tar"
 )
 
 // 32 MB, same as http.
@@ -99,7 +101,7 @@ func UploadServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	if attach != nil {
 		defer attach.Close()
 
-		err = Untar(attach, ServiceDir)
+		err = tar.Untar(attach, ServiceDir)
 		if err != nil {
 			res.Body["error"] = err.Error()
 			res.Send(http.StatusInternalServerError)
@@ -225,7 +227,7 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 
 // GET /, Retrieve the service and send it in a gzipped tar.
 func GetServiceHandler(rw http.ResponseWriter, req *http.Request) {
-	contents, err := Tar(ServiceDir)
+	contents, err := tar.Tar(ServiceDir, []string{})
 	if err != nil {
 		res := NewResponder(rw, req)
 		res.Body["error"] = err.Error()
