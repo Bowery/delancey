@@ -228,11 +228,19 @@ func UpdateServiceHandler(rw http.ResponseWriter, req *http.Request) {
 // GET /, Retrieve the service and send it in a gzipped tar.
 func GetServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	contents, err := tar.Tar(ServiceDir, []string{})
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		res := NewResponder(rw, req)
 		res.Body["error"] = err.Error()
 		res.Send(http.StatusInternalServerError)
 		return
+	}
+
+	// If the path didn't exist, just provide an empty targz stream.
+	if err != nil {
+		empty, gzipWriter, tarWriter := tar.NewTarGZ()
+		tarWriter.Close()
+		gzipWriter.Close()
+		contents = empty
 	}
 
 	rw.WriteHeader(http.StatusOK)
