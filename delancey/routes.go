@@ -251,11 +251,35 @@ func GetServiceHandler(rw http.ResponseWriter, req *http.Request) {
 func RemoveServiceHandler(rw http.ResponseWriter, req *http.Request) {
 	res := NewResponder(rw, req)
 
-	err := os.RemoveAll("/application")
+	dir, err := os.Open(ServiceDir)
+	if err != nil && !os.IsNotExist(err) {
+		res.Body["error"] = err.Error()
+		res.Send(http.StatusInternalServerError)
+		return
+	}
+
+	// ServiceDir doesn't exist, nothing to do.
+	if err != nil {
+		res.Body["status"] = "success"
+		res.Send(http.StatusOK)
+		return
+	}
+	defer dir.Close()
+
+	contents, err := dir.Readdir(0)
 	if err != nil {
 		res.Body["error"] = err.Error()
 		res.Send(http.StatusInternalServerError)
 		return
+	}
+
+	for _, path := range contents {
+		err = os.RemoveAll(filepath.Join(ServiceDir, path.Name()))
+		if err != nil {
+			res.Body["error"] = err.Error()
+			res.Send(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	res.Body["status"] = "success"
