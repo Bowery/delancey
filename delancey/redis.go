@@ -1,3 +1,4 @@
+// Copyright 2013-2014 Bowery, Inc.
 package main
 
 import (
