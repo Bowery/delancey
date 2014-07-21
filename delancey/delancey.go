@@ -58,6 +58,9 @@ func main() {
 		Handler: &SlashHandler{&LogHandler{os.Stdout, router}},
 	}
 
+	// Start tcp.
+	go StartTCP()
+
 	fmt.Println("Satellite starting!")
 	err = server.ListenAndServe()
 	if err != nil {
