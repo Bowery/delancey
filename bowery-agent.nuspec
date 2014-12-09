@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Do not remove this test for UTF-8: if “Ω” doesn’t appear as greek uppercase omega letter enclosed in quotation marks, you should use an editor that supports UTF-8, not this one. -->
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>bowery-agent</id>
+    <title>Bowery Agent</title>
+    <version>{{version}}</version>
+    <authors>Bowery</authors>
+    <summary>Bowery code sync and process management server.</summary>
+    <description>
+Bowery code sync and process management server.
+
+This installation runs the Bowery agent as a Windows Service named "Bowery-Agent".
+
+The server listens on port 32056, so when using the Bowery client and creating an application make sure you provide the port.
+    </description>
+    <projectUrl>http://bowery.io</projectUrl>
+    <tags>sync server bowery process development productivity bowery-agent bowery-client</tags>
+    <copyright>Copyright 2013-2014 Bowery, Inc.</copyright>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <iconUrl>http://bowery.sh.s3.amazonaws.com/icon.png</iconUrl>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

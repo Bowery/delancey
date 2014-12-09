@@ -1,0 +1,9 @@
+[Unit]
+Description=Delancey by Bowery
+
+[Service]
+ExecStart=/usr/local/bin/bowery-updater "http://bowery.sh.s3.amazonaws.com/VERSION" "" /usr/local/bin/bowery-agent
+Environment="ENV=production"
+
+[Install]
+WantedBy=multi-user.target

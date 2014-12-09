@@ -1,15 +1,9 @@
 dependencies:
   override:
-    - pip install fabric
-    - pip install requests
+    - echo ""
 test:
   override:
     - mkdir -p /home/ubuntu/.go_workspace/src/github.com/Bowery
     - git clone git@github.com:Bowery/gopackages /home/ubuntu/.go_workspace/src/github.com/Bowery/gopackages
     - cp -r /home/ubuntu/delancey /home/ubuntu/.go_workspace/src/github.com/Bowery/delancey
-    - cd /home/ubuntu/.go_workspace/src/github.com/Bowery/delancey/delancey && go get && go test ./...
-deployment:
-  production:
-    branch: master
-    commands:
-      - fab deploy
+    - cd /home/ubuntu/.go_workspace/src/github.com/Bowery/delancey && go get && go test ./...
