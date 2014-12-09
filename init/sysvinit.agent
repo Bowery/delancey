@@ -1,0 +1,42 @@
+#!/bin/bash
+
+BASE=$(basename $0)
+AGENT=/usr/local/bin/$BASE
+UPDATER=/usr/local/bin/bowery-updater
+PIDFILE=/var/run/$BASE.pid
+SSD_PIDFILE=/var/run/$BASE-ssd.pid
+LOGFILE=/var/log/$BASE.log
+VERSIONURL="http://bowery.sh.s3.amazonaws.com/VERSION"
+
+if [[ -e /etc/rc.d/init.d/functions ]]; then
+  . /etc/rc.d/init.d/functions
+elif [[ -e /lib/lsb/init-functions ]]; then
+  . /lib/lsb/init-functions
+fi
+
+case $1 in
+  start)
+    touch "$LOGFILE"
+    log_begin_msg "Starting Bowery agent: $BASE"
+    ENV=production
+    start-stop-daemon --start --background \
+      --no-close \
+      --exec "$UPDATER '$VERSIONURL' '' $AGENT" \
+      --pidfile "$PIDFILE" \
+      --make-pidfile \
+      -p "$PIDFILE" >> "$LOGFILE" 2>&1
+    log_end_msg $? ;;
+  stop)
+    log_begin_msg "Stopping Bowery agent: $BASE"
+    start-stop-daemon --stop --pidfile "$PIDFILE"
+    log_end_msg $? ;;
+  restart)
+    log_begin_msg "Restartng Bowery agent: $BASE"
+    pid=`cat "$PIDFILE" 2>/dev/null`
+    [ -n "$pid" ] \
+      && ps -p $pid > /dev/null 2>&1 \
+      && $0 stop
+    $0 start ;;
+  *)
+    echo "Usage: $0 [start|stop]" ;;
+esac

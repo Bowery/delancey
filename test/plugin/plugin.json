@@ -1,0 +1,12 @@
+{
+  "name": "test-plugin",
+  "author": {
+    "name": "Steve Kaliski",
+    "email": "steve@bowery.io",
+    "twitter": "stevekaliski",
+    "github": "sjkaliski"
+  },
+  "hooks": {
+    "on-app-restart": "echo 'Off The Hook'"
+  }
+}

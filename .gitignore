@@ -1,7 +1,2 @@
-delancey/delancey
-delancey/test/application/http_test.go
-images/bowery/satellite
-monitor/monitor
-license/license
-.vagrant
-fabfile.pyc
+delancey
+pkg
