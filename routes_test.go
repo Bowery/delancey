@@ -2,11 +2,9 @@
 package main
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
+	"encoding/json"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -14,99 +12,179 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Bowery/delancey/plugin"
+	"github.com/Bowery/gopackages/requests"
+	"github.com/Bowery/gopackages/schemas"
+	"github.com/Bowery/gopackages/tar"
 )
 
+var Rcontainer = &schemas.Container{
+	ID: "some-id",
+}
+var uploadPath = filepath.Join("test", "upload.tar.gz")
+
 func init() {
-	Applications["some-app-id"] = &Application{
-		ID: "some-app-id",
-	}
-
-	plugin.SetPluginManager()
-	plugin.PluginDir = filepath.Join("test", "plugins")
-	tarPath := filepath.Join("test", "plugin.tar.gz")
-
+	Env = "testing"
 	err := os.MkdirAll("test", os.ModePerm|os.ModeDir)
 	if err != nil {
 		panic(err)
 	}
 
 	// If the tar file exists don't create it.
-	_, err = os.Stat(tarPath)
+	_, err = os.Stat(uploadPath)
 	if err == nil {
 		return
 	}
 
 	// Create a gzipped tar file in test.
-	file, err := os.Create(filepath.Join("test", "plugin.tar.gz"))
+	file, err := os.Create(filepath.Join("test", "upload.tar.gz"))
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
-	gzipper := gzip.NewWriter(file)
-	defer gzipper.Close()
-	tarWriter := tar.NewWriter(gzipper)
-	defer tarWriter.Close()
 
-	// Contents to copy to tar.
-	contents, err := os.Open(filepath.Join("test", "plugin", "plugin.json"))
-	if err != nil {
-		panic(err)
-	}
-	defer contents.Close()
-
-	// Create header for file.
-	stats, err := contents.Stat()
-	if err != nil {
-		panic(err)
-	}
-	header, err := tar.FileInfoHeader(stats, "")
+	contents, err := tar.Tar(".", nil)
 	if err != nil {
 		panic(err)
 	}
 
-	// Copy contents.
-	err = tarWriter.WriteHeader(header)
-	if err == nil {
-		_, err = io.Copy(tarWriter, contents)
-	}
+	_, err = io.Copy(file, contents)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func TestUploadPluginHandlerWithNoName(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UploadPluginHandler))
+func TestUploadNoContainer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(UploadContainerHandler))
 	defer server.Close()
 
-	req, err := newUploadRequest(server.URL, map[string]string{
-		"file": filepath.Join("test", "plugin.tar.gz"),
-	}, nil)
+	file, err := os.Open(uploadPath)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer file.Close()
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := http.Post(server.URL, "application/x-gzip", file)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusBadRequest {
-		t.Error("Accepted a plugin with no name provided.")
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resData.Status != requests.StatusFailed {
+		t.Error("Upload passed when it should've failed")
 	}
 }
 
-func TestUploadPluginHandlerWithValidRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UploadPluginHandler))
+func TestCreateContainer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(CreateContainerHandler))
 	defer server.Close()
 
-	req, err := newUploadRequest(server.URL, map[string]string{
-		"file": filepath.Join("test", "plugin.tar.gz"),
-	}, map[string]string{
-		"appID": "some-app-id",
-		"name":  "test-plugin",
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	err := encoder.Encode(Rcontainer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.Post(server.URL, "application/json", &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	containerRes := new(requests.ContainerRes)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(containerRes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if containerRes.Status != requests.StatusCreated {
+		t.Error("Should've been created but failed")
+	}
+
+	Rcontainer.RemotePath = containerRes.Container.RemotePath
+}
+
+func TestCreateContainerCreated(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(CreateContainerHandler))
+	defer server.Close()
+
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	err := encoder.Encode(Rcontainer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.Post(server.URL, "application/json", &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	containerRes := new(requests.ContainerRes)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(containerRes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if containerRes.Status == requests.StatusCreated {
+		t.Error("Should've been failed but didn't")
+	}
+
+	if CurrentContainer == nil {
+		t.Error("CurrentContainer should be set after create")
+	}
+}
+
+func TestUpload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(UploadContainerHandler))
+	defer server.Close()
+
+	file, err := os.Open(uploadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	res, err := http.Post(server.URL, "application/x-gzip", file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resData.Status != requests.StatusSuccess {
+		t.Error("Upload failed when it should've passed")
+	}
+}
+
+func TestUpdateDir(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(UpdateContainerHandler))
+	defer server.Close()
+
+	req, err := newUploadRequest(server.URL, nil, map[string]string{
+		"pathtype": "dir",
+		"path":     "newdir",
+		"type":     "create",
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -114,16 +192,34 @@ func TestUploadPluginHandlerWithValidRequest(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		t.Error("Failed to add plugin.")
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resData.Status != requests.StatusUpdated {
+		t.Error("Update failed but should've passed")
+	}
+
+	_, err = os.Stat(filepath.Join(Rcontainer.RemotePath, "newdir"))
+	if err != nil {
+		t.Error("newdir should exist but stat failed")
 	}
 }
 
-func TestUpdatePluginHandlerWithNoName(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UpdatePluginHandler))
+func TestUpdateFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(UpdateContainerHandler))
 	defer server.Close()
 
-	req, err := http.NewRequest("PUT", server.URL, nil)
+	req, err := newUploadRequest(server.URL, map[string]string{
+		"file": uploadPath,
+	}, map[string]string{
+		"pathtype": "file",
+		"path":     "somecoolfile",
+		"type":     "create",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,46 +230,32 @@ func TestUpdatePluginHandlerWithNoName(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusBadRequest {
-		t.Error("Accepted a plugin with no name provided.")
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resData.Status != requests.StatusUpdated {
+		t.Error("Update failed but should've passed")
+	}
+
+	_, err = os.Stat(filepath.Join(Rcontainer.RemotePath, "somecoolfile"))
+	if err != nil {
+		t.Error("somecoolfile should exist but stat failed")
 	}
 }
 
-func TestUpdatePluginHandlerWithValidRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UpdatePluginHandler))
+func TestUpdateDeleteFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(UpdateContainerHandler))
 	defer server.Close()
 
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	writer.WriteField("appID", "some-app-id")
-	writer.WriteField("name", "test-plugin")
-	writer.WriteField("isEnabled", "true")
-	writer.Close()
-
-	req, err := http.NewRequest("PUT", server.URL, &body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if req != nil {
-		req.Header.Set("Content-Type", writer.FormDataContentType())
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		t.Error("Failed to update plugin.")
-	}
-}
-
-func TestRemovePluginHandlerWithInvalidQuery(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(RemovePluginHandler))
-	defer server.Close()
-
-	req, err := http.NewRequest("DELETE", server.URL+"?foo=bar", nil)
+	req, err := newUploadRequest(server.URL, nil, map[string]string{
+		"pathtype": "file",
+		"path":     "somecoolfile",
+		"type":     "delete",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,33 +266,25 @@ func TestRemovePluginHandlerWithInvalidQuery(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusBadRequest {
-		t.Error("Completed request with bad query.")
-	}
-}
-
-func TestRemovePluginHandlerWithValidRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(RemovePluginHandler))
-	defer server.Close()
-
-	req, err := http.NewRequest("DELETE", server.URL+"?name=test-plugin", nil)
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
+	if resData.Status != requests.StatusUpdated {
+		t.Error("Update failed but should've passed")
 	}
-	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		t.Error("Response not ok")
+	_, err = os.Stat(filepath.Join(Rcontainer.RemotePath, "somecoolfile"))
+	if err == nil {
+		t.Error("somecoolfile shouldn't exist but stat passed")
 	}
 }
 
-func TestGetHealthz(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(HealthzHandler))
+func TestRemoveContainer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(RemoveContainerHandler))
 	defer server.Close()
 
 	res, err := http.Get(server.URL)
@@ -219,17 +293,19 @@ func TestGetHealthz(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 {
-		t.Error("Status Code of Healthz was not 200.")
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
 	if err != nil {
-		t.Fatal("Unable to read response body.")
+		t.Fatal(err)
 	}
 
-	if string(body) != "ok" {
-		t.Error("Healthz body was not ok.")
+	if resData.Status != requests.StatusRemoved {
+		t.Error("Remove should've succeeded but didn't")
+	}
+
+	if CurrentContainer != nil {
+		t.Error("CurrentContainer should be unset after remove")
 	}
 }
 
