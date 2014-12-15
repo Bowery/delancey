@@ -36,7 +36,8 @@ func main() {
 		fmt.Println(VERSION)
 		os.Exit(0)
 	}
-	fmt.Println("Starting up Delancey with Docker at ", dockerAddr)
+
+	fmt.Println("Starting up Delancey with Docker at", dockerAddr)
 	DockerClient, err = docker.NewClient(dockerAddr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

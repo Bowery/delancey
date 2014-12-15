@@ -2,7 +2,7 @@ DEPS = $(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 
 all: deps format
 	@go build -o delancey.out
-	@./delancey.out --docker ${DOCKER_ADDR}
+	@./delancey.out ${ARGS}
 
 deps:
 	@go get -d -v ./...
