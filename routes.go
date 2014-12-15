@@ -432,6 +432,8 @@ func UpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 // DELETE /, Remove service.
 func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
+	skipCommit := req.FormValue("skip") != ""
+
 	// Container needs to exist.
 	if CurrentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
@@ -447,20 +449,10 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 
 	if Env != "testing" {
-		// Get the changes for the image.
-		changes, err := DockerClient.Changes(CurrentContainer.DockerID, nil)
-		if err != nil {
-			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-				"status": requests.StatusFailed,
-				"error":  err.Error(),
-			})
-			return
-		}
-		image := config.DockerBaseImage + ":" + CurrentContainer.ImageID
-
-		// Push changes up.
-		if len(changes) > 0 {
-			err = DockerClient.CommitImage(CurrentContainer.DockerID, image)
+		// Only get changes and commit if we're not skipping it.
+		if !skipCommit {
+			// Get the changes for the image.
+			changes, err := DockerClient.Changes(CurrentContainer.DockerID, nil)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -468,8 +460,21 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				})
 				return
 			}
+			image := config.DockerBaseImage + ":" + CurrentContainer.ImageID
 
-			go DockerClient.PushImage(image)
+			// Push changes up.
+			if len(changes) > 0 {
+				err = DockerClient.CommitImage(CurrentContainer.DockerID, image)
+				if err != nil {
+					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+						"status": requests.StatusFailed,
+						"error":  err.Error(),
+					})
+					return
+				}
+
+				go DockerClient.PushImage(image)
+			}
 		}
 
 		// Get the container to remove the build image.
