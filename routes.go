@@ -23,6 +23,7 @@ import (
 	"github.com/Bowery/gopackages/sys"
 	"github.com/Bowery/gopackages/tar"
 	"github.com/Bowery/gopackages/web"
+	"github.com/Bowery/kenmare/kenmare"
 	"github.com/unrolled/render"
 )
 
@@ -469,7 +470,14 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			go DockerClient.PushImage(image)
+			// Push in parallel and then send the image to Kenmare to signal an
+			// update completed.
+			go func(id string) {
+				err := DockerClient.PushImage(image)
+				if err == nil {
+					kenmare.UpdateImage(id)
+				}
+			}(CurrentContainer.ImageID)
 		}
 
 		// Get the container to remove the build image.
