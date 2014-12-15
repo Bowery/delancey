@@ -227,8 +227,12 @@ func Update(container *schemas.Container, full, name, status string) error {
 }
 
 // Delete removes the container from the instance.
-func Delete(container *schemas.Container) error {
+func Delete(container *schemas.Container, commit bool) error {
 	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
+	if !commit {
+		addr += "?skip=true"
+	}
+
 	req, err := http.NewRequest("DELETE", "http://"+addr, nil)
 	if err != nil {
 		return err
