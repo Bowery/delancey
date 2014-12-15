@@ -433,6 +433,8 @@ func UpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 // DELETE /, Remove service.
 func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
+	skipCommit := req.FormValue("skip") != ""
+
 	// Container needs to exist.
 	if CurrentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
@@ -448,20 +450,9 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 
 	if Env != "testing" {
-		// Get the changes for the image.
-		changes, err := DockerClient.Changes(CurrentContainer.DockerID, nil)
-		if err != nil {
-			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-				"status": requests.StatusFailed,
-				"error":  err.Error(),
-			})
-			return
-		}
-		image := config.DockerBaseImage + ":" + CurrentContainer.ImageID
-
-		// Push changes up.
-		if len(changes) > 0 {
-			err = DockerClient.CommitImage(CurrentContainer.DockerID, image)
+		if skipCommit {
+			// Get the changes for the image.
+			changes, err := DockerClient.Changes(CurrentContainer.DockerID, nil)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -469,15 +460,28 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				})
 				return
 			}
+			image := config.DockerBaseImage + ":" + CurrentContainer.ImageID
 
-			// Push in parallel and then send the image to Kenmare to signal an
-			// update completed.
-			go func(id string) {
-				err := DockerClient.PushImage(image)
-				if err == nil {
-					kenmare.UpdateImage(id)
+			// Push changes up.
+			if len(changes) > 0 {
+				err = DockerClient.CommitImage(CurrentContainer.DockerID, image)
+				if err != nil {
+					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+						"status": requests.StatusFailed,
+						"error":  err.Error(),
+					})
+					return
 				}
-			}(CurrentContainer.ImageID)
+
+				// Push in parallel and then send the image to Kenmare to signal an
+				// update completed.
+				go func(id string) {
+					err := DockerClient.PushImage(image)
+					if err == nil {
+						kenmare.UpdateImage(id)
+					}
+				}(CurrentContainer.ImageID)
+			}
 		}
 
 		// Get the container to remove the build image.
