@@ -15,7 +15,7 @@ test:
 	@go test ./...
 
 release:
-	@bash --norc ./scripts/release_agent.sh
+	@bash --norc ./scripts/release_agent_simple.sh
 
 agent: release
 
