@@ -1,8 +1,8 @@
 DEPS = $(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 
 all: deps format
-	@go build -o delancey.bin
-	@./delancey.bin
+	@go build -o delancey.out
+	@./delancey.out --docker ${DOCKER_ADDR}
 
 deps:
 	@go get -d -v ./...
@@ -20,6 +20,6 @@ release:
 agent: release
 
 clean:
-	-rm -rf delancey.bin pkg debug.log
+	-rm -rf delancey.out pkg debug.log
 
 .PHONY: all deps format test release agent clean

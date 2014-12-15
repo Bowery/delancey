@@ -17,16 +17,18 @@ import (
 
 var (
 	AgentHost, _ = util.GetHost()
+	logClient    = loggly.New(config.LogglyKey, "agent")
 	DockerClient *docker.Client
+	dockerAddr   string
 	Env          string
 	VERSION      string // This is set when release_agent.sh is ran.
-	logClient    = loggly.New(config.LogglyKey, "agent")
 	err          error
 )
 
 func main() {
 	ver := false
 	runtime.GOMAXPROCS(1)
+	flag.StringVar(&dockerAddr, "docker", "unix:///var/run/docker.sock", "Set a custom endpoint for your local Docker service")
 	flag.StringVar(&Env, "env", "production", "If you want to run the agent in development mode uses different ports")
 	flag.BoolVar(&ver, "version", false, "Print the version")
 	flag.Parse()
@@ -34,8 +36,8 @@ func main() {
 		fmt.Println(VERSION)
 		os.Exit(0)
 	}
-
-	DockerClient, err = docker.NewClient("unix:///var/run/docker.sock")
+	fmt.Println("Starting up Delancey with Docker at ", dockerAddr)
+	DockerClient, err = docker.NewClient(dockerAddr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
