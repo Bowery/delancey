@@ -230,11 +230,12 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
-
-		id, err := DockerClient.Create(&docker.Config{
+		config := &docker.Config{
 			Volumes:     map[string]string{container.RemotePath: "/root"},
 			NetworkMode: "host",
-		}, image, []string{"/usr/sbin/sshd", "-D"})
+		}
+
+		id, err := DockerClient.Create(config, image, []string{"/usr/sbin/sshd", "-D"})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
@@ -247,7 +248,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err = DockerClient.Start(id)
+		err = DockerClient.Start(config, id)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
