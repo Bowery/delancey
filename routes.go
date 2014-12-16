@@ -20,7 +20,6 @@ import (
 	"github.com/Bowery/gopackages/docker"
 	"github.com/Bowery/gopackages/requests"
 	"github.com/Bowery/gopackages/schemas"
-	"github.com/Bowery/gopackages/sys"
 	"github.com/Bowery/gopackages/tar"
 	"github.com/Bowery/gopackages/web"
 	"github.com/Bowery/kenmare/kenmare"
@@ -35,7 +34,8 @@ const (
 )
 
 var (
-	HomeDir          = os.Getenv(sys.HomeVar)
+	//HomeDir          = os.Getenv(sys.HomeVar)
+	HomeDir          = "/home/ubuntu"
 	BoweryDir        = filepath.Join(HomeDir, ".bowery")
 	CurrentContainer *schemas.Container
 )
