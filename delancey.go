@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/Bowery/gopackages/config"
 	"github.com/Bowery/gopackages/docker"
@@ -44,11 +45,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Pull down base image with latest tag, and within a
+	// routine, pull down all tags. This is a temporary, and
+	// semi hacky, solution to speed up provision times.
 	err = DockerClient.PullImage(config.DockerBaseImage + ":latest")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	go func() {
+		for {
+			<-time.After(10 * time.Second)
+			DockerClient.PullImage(config.DockerBaseImage)
+		}
+	}()
 
 	port := config.DelanceyProdPort
 	if Env == "development" {
