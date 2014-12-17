@@ -6,9 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/Bowery/gopackages/config"
-	"github.com/Bowery/gopackages/requests"
-	"github.com/Bowery/gopackages/schemas"
 	"io"
 	"mime/multipart"
 	"net"
@@ -18,6 +15,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/Bowery/gopackages/config"
+	"github.com/Bowery/gopackages/requests"
+	"github.com/Bowery/gopackages/schemas"
+	"github.com/Bowery/gopackages/tar"
 )
 
 // Errors that may occur.
@@ -252,6 +254,44 @@ func Delete(container *schemas.Container, commit bool) error {
 	}
 
 	if resData.Status != requests.StatusRemoved {
+		// If the error matches return var.
+		if resData.Error() == ErrNotInUse.Error() {
+			return ErrNotInUse
+		}
+
+		return resData
+	}
+
+	return nil
+}
+
+// UploadSSH sends the .ssh directory to the container
+func UploadSSH(container *schemas.Container, path string) error {
+	contents, err := tar.Tar(path, []string{})
+	if err != nil {
+		return err
+	}
+
+	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
+	req, err := http.NewRequest("PUT", "http://"+addr+"/ssh", contents)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		return err
+	}
+
+	if resData.Status != requests.StatusSuccess {
 		// If the error matches return var.
 		if resData.Error() == ErrNotInUse.Error() {
 			return ErrNotInUse
