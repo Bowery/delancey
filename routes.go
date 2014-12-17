@@ -37,6 +37,7 @@ var (
 	//HomeDir          = os.Getenv(sys.HomeVar)
 	HomeDir          = "/home/ubuntu"
 	BoweryDir        = filepath.Join(HomeDir, ".bowery")
+	SSHDir           = filepath.Join(BoweryDir, ".ssh")
 	CurrentContainer *schemas.Container
 )
 
@@ -52,6 +53,7 @@ var Routes = []web.Route{
 	{"PUT", "/", UploadContainerHandler, false},
 	{"PATCH", "/", UpdateContainerHandler, false},
 	{"DELETE", "/", RemoveContainerHandler, false},
+	{"PUT", "/ssh", UploadSSHHandler, false},
 	{"GET", "/healthz", HealthzHandler, false},
 	{"GET", "/_/state/container", ContainerStateHandler, false},
 }
@@ -135,7 +137,21 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		})
 		return
 	}
+
 	image := config.DockerBaseImage + ":" + container.ImageID
+	sshPath := filepath.Join(SSHDir, container.ID)
+	err = os.MkdirAll(sshPath, os.ModePerm|os.ModeDir)
+	if err != nil {
+		go logClient.Error(err.Error(), map[string]interface{}{
+			"container": container,
+			"ip":        AgentHost,
+		})
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
+	}
 
 	if Env != "testing" {
 		// Pull down the containers image.
@@ -231,7 +247,10 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		config := &docker.Config{
-			Volumes:     map[string]string{container.RemotePath: "/root"},
+			Volumes: map[string]string{
+				container.RemotePath: "/root",
+				sshPath:              "/root/.ssh",
+			},
 			NetworkMode: "host",
 		}
 
@@ -542,6 +561,32 @@ func ContainerStateHandler(rw http.ResponseWriter, req *http.Request) {
 // GET /healthz, Return the status of the agent.
 func HealthzHandler(rw http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(rw, "ok")
+}
+
+// PUT /ssh, Accepts ssh tarfile for user auth to their container
+func UploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
+	// Require a container to exist.
+	if CurrentContainer == nil {
+		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  delancey.ErrNotInUse.Error(),
+		})
+		return
+	}
+
+	// Untar the tar contents from the body to the containers path.
+	err := tar.Untar(req.Body, filepath.Join(SSHDir, CurrentContainer.ID))
+	if err != nil {
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	renderer.JSON(rw, http.StatusOK, map[string]string{
+		"status": requests.StatusSuccess,
+	})
 }
 
 // createImageInput creates a tar reader using a template as the Dockerfile.
