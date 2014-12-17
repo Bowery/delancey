@@ -273,7 +273,7 @@ func UploadSSH(container *schemas.Container, path string) error {
 	}
 
 	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
-	req, err := http.NewRequest("PUT", "http://"+addr, contents)
+	req, err := http.NewRequest("PUT", "http://"+addr+"/ssh", contents)
 	if err != nil {
 		return err
 	}
