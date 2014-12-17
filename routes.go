@@ -37,7 +37,7 @@ var (
 	//HomeDir          = os.Getenv(sys.HomeVar)
 	HomeDir          = "/home/ubuntu"
 	BoweryDir        = filepath.Join(HomeDir, ".bowery")
-	SSHDir           = filepath.Join(BoweryDir, ".ssh")
+	SSHDir           = filepath.Join(BoweryDir, "ssh")
 	CurrentContainer *schemas.Container
 )
 
