@@ -6,9 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/Bowery/gopackages/config"
-	"github.com/Bowery/gopackages/requests"
-	"github.com/Bowery/gopackages/schemas"
 	"io"
 	"mime/multipart"
 	"net"
@@ -18,6 +15,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/Bowery/gopackages/config"
+	"github.com/Bowery/gopackages/requests"
+	"github.com/Bowery/gopackages/schemas"
+	"github.com/Bowery/gopackages/tar"
 )
 
 // Errors that may occur.
@@ -265,7 +267,7 @@ func Delete(container *schemas.Container, commit bool) error {
 
 // UploadSSH sends the .ssh directory to the container
 func UploadSSH(container *schemas.Container, path string) error {
-	contents, err = tar.Tar(path, []string{})
+	contents, err := tar.Tar(path, []string{})
 	if err != nil {
 		return err
 	}
