@@ -198,20 +198,17 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			go DockerClient.PushImage(image)
-
-			err = DockerClient.Remove(id)
-			if err != nil {
-				go logClient.Error(err.Error(), map[string]interface{}{
-					"container": container,
-					"ip":        AgentHost,
-				})
-				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-					"status": requests.StatusFailed,
-					"error":  err.Error(),
-				})
-				return
-			}
+			go func(img string) {
+				DockerClient.PushImage(img)
+				err = DockerClient.Remove(id)
+				if err != nil {
+					logClient.Error(err.Error(), map[string]interface{}{
+						"container": container,
+						"ip":        AgentHost,
+					})
+					return
+				}
+			}(image)
 		}
 
 		// Build the image to use for the container, which sets the password.
