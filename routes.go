@@ -534,8 +534,9 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Remove the containers path and clean up the current container.
+	// Remove the containers path/ssh and clean up the current container.
 	os.RemoveAll(CurrentContainer.RemotePath)
+	os.RemoveAll(filepath.Join(SSHDir, CurrentContainer.ID))
 	CurrentContainer = nil
 	SaveContainer()
 	renderer.JSON(rw, http.StatusOK, map[string]string{
