@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"github.com/Bowery/gopackages/docker"
 	"github.com/Bowery/gopackages/requests"
 	"github.com/Bowery/gopackages/schemas"
+	"github.com/Bowery/gopackages/sys"
 	"github.com/Bowery/gopackages/tar"
 	"github.com/Bowery/gopackages/web"
 	"github.com/Bowery/kenmare/kenmare"
@@ -34,7 +36,7 @@ const (
 )
 
 var (
-	//HomeDir          = os.Getenv(sys.HomeVar)
+	//HomeDir = os.Getenv(sys.HomeVar)
 	HomeDir          = "/home/ubuntu"
 	BoweryDir        = filepath.Join(HomeDir, ".bowery")
 	SSHDir           = filepath.Join(BoweryDir, "ssh")
@@ -155,6 +157,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 	if Env != "testing" {
 		// Pull down the containers image.
+		log.Println("Pulling down image", container.ImageID)
 		err = DockerClient.PullImage(image)
 		if err != nil && !docker.IsTagNotFound(err) {
 			go logClient.Error(err.Error(), map[string]interface{}{
@@ -171,6 +174,8 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		// If the tag doesn't exist yet, create it from the base.
 		if err != nil {
 			// Create a container using the base.
+			log.Println("Image doesn't exist", container.ImageID)
+			log.Println("Creating build container using base image for", container.ImageID)
 			id, err := DockerClient.Create(new(docker.Config), config.DockerBaseImage, nil)
 			if err != nil {
 				go logClient.Error(err.Error(), map[string]interface{}{
@@ -185,6 +190,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			}
 
 			// Commit the empty container.
+			log.Println("Commit build container to image", container.ImageID)
 			err = DockerClient.CommitImage(id, image)
 			if err != nil {
 				go logClient.Error(err.Error(), map[string]interface{}{
@@ -198,23 +204,17 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			go DockerClient.PushImage(image)
+			go func(img string) {
+				log.Println("Pushing image to hub", container.ImageID)
+				DockerClient.PushImage(img)
 
-			err = DockerClient.Remove(id)
-			if err != nil {
-				go logClient.Error(err.Error(), map[string]interface{}{
-					"container": container,
-					"ip":        AgentHost,
-				})
-				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-					"status": requests.StatusFailed,
-					"error":  err.Error(),
-				})
-				return
-			}
+				log.Println("Removing build container", container.ImageID)
+				DockerClient.Remove(id)
+			}(image)
 		}
 
 		// Build the image to use for the container, which sets the password.
+		log.Println("Creating Dockerfile input", container.ImageID)
 		user := "root"
 		password := uuid.New()
 		input, err := createImageInput(passwordDockerfile, map[string]string{
@@ -234,6 +234,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		log.Println("Creating runner image for container", container.ImageID)
 		image, err = DockerClient.BuildImage(input, "", config.DockerBaseImage)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
@@ -254,6 +255,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			NetworkMode: "host",
 		}
 
+		log.Println("Creating container", container.ImageID)
 		id, err := DockerClient.Create(config, image, []string{"/usr/sbin/sshd", "-D"})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
@@ -267,6 +269,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		log.Println("Starting container", container.ImageID)
 		err = DockerClient.Start(config, id)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
@@ -279,6 +282,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
+		log.Println("Container started", container.ImageID)
 
 		container.User = user
 		container.Password = password
@@ -472,6 +476,7 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	if Env != "testing" {
 		if skipCommit {
 			// Get the changes for the image.
+			log.Println("Getting changes for container", CurrentContainer.ImageID)
 			changes, err := DockerClient.Changes(CurrentContainer.DockerID, nil)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -484,6 +489,7 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 			// Push changes up.
 			if len(changes) > 0 {
+				log.Println("Committing image changes", CurrentContainer.ImageID)
 				err = DockerClient.CommitImage(CurrentContainer.DockerID, image)
 				if err != nil {
 					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -496,15 +502,18 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				// Push in parallel and then send the image to Kenmare to signal an
 				// update completed.
 				go func(id string) {
+					log.Println("Pushing image to hub", id)
 					err := DockerClient.PushImage(image)
 					if err == nil {
 						kenmare.UpdateImage(id)
 					}
+					log.Println("Image push complete", id)
 				}(CurrentContainer.ImageID)
 			}
 		}
 
 		// Get the container to remove the build image.
+		log.Println("Inspecting container", CurrentContainer.ImageID)
 		container, err := DockerClient.Inspect(CurrentContainer.DockerID)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -515,6 +524,7 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		// Remove the container and its image.
+		log.Println("Removing container", CurrentContainer.ImageID)
 		err = DockerClient.Remove(CurrentContainer.DockerID)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -524,6 +534,7 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		log.Println("Removing runner image", CurrentContainer.ImageID)
 		err = DockerClient.RemoveImage(container.Image)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
