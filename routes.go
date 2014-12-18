@@ -21,7 +21,6 @@ import (
 	"github.com/Bowery/gopackages/docker"
 	"github.com/Bowery/gopackages/requests"
 	"github.com/Bowery/gopackages/schemas"
-	"github.com/Bowery/gopackages/sys"
 	"github.com/Bowery/gopackages/tar"
 	"github.com/Bowery/gopackages/web"
 	"github.com/Bowery/kenmare/kenmare"
