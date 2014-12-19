@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -303,6 +304,7 @@ func UploadSSH(container *schemas.Container, path string) error {
 
 // Health checks if a delancey instance is running.
 func Health(addr string) error {
+	addr = net.JoinHostPort(addr, config.DelanceyProdPort)
 	res, err := http.Get("http://" + addr + "/healthz")
 	if err != nil {
 		return err
@@ -311,6 +313,29 @@ func Health(addr string) error {
 
 	if res.StatusCode != http.StatusOK {
 		return http.ErrNotSupported
+	}
+
+	return nil
+}
+
+// PullImage tells a delancey instance to pull an image.
+func PullImage(addr, image string) error {
+	addr = net.JoinHostPort(addr, config.DelanceyProdPort)
+	res, err := http.PostForm("http://"+addr+"/_/pull", url.Values{"image": {image}})
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		return err
+	}
+
+	if resData.Status != requests.StatusSuccess {
+		return resData
 	}
 
 	return nil

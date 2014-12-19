@@ -57,6 +57,7 @@ var Routes = []web.Route{
 	{"PUT", "/ssh", uploadSSHHandler, false},
 	{"GET", "/healthz", healthzHandler, false},
 	{"GET", "/_/state/container", containerStateHandler, false},
+	{"POST", "/_/pull", pullImageHandler, false},
 }
 
 // GET /, Retrieve the containers code.
@@ -542,6 +543,37 @@ func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 }
 
+// PUT /ssh, Accepts ssh tarfile for user auth to their container
+func uploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
+	// Require a container to exist.
+	if currentContainer == nil {
+		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  delancey.ErrNotInUse.Error(),
+		})
+		return
+	}
+
+	// Untar the tar contents from the body to the containers path.
+	err := tar.Untar(req.Body, currentContainer.SSHPath)
+	if err != nil {
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	renderer.JSON(rw, http.StatusOK, map[string]string{
+		"status": requests.StatusSuccess,
+	})
+}
+
+// GET /healthz, Return the status of the agent.
+func healthzHandler(rw http.ResponseWriter, req *http.Request) {
+	fmt.Fprintf(rw, "ok")
+}
+
 // GET /_/state/container, Return the current container data.
 func containerStateHandler(rw http.ResponseWriter, req *http.Request) {
 	data, err := json.Marshal(currentContainer)
@@ -557,24 +589,23 @@ func containerStateHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
-// GET /healthz, Return the status of the agent.
-func healthzHandler(rw http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(rw, "ok")
-}
-
-// PUT /ssh, Accepts ssh tarfile for user auth to their container
-func uploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
-	// Require a container to exist.
-	if currentContainer == nil {
+// PUT /_/pull, Pulls an image down from Docker.
+func pullImageHandler(rw http.ResponseWriter, req *http.Request) {
+	image := req.FormValue("image")
+	if image == "" {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
-			"error":  delancey.ErrNotInUse.Error(),
+			"error":  "Image query param required",
 		})
 		return
 	}
 
-	// Untar the tar contents from the body to the containers path.
-	err := tar.Untar(req.Body, filepath.Join(sshDir, currentContainer.ID))
+	// If not in format repo:tag, assume it's a tag for the default repo.
+	if !strings.Contains(image, ":") {
+		image = config.DockerBaseImage + ":" + image
+	}
+
+	err := DockerClient.PullImage(image)
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
