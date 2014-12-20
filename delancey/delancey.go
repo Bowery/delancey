@@ -232,7 +232,7 @@ func Update(container *schemas.Container, full, name, status string) error {
 func Delete(container *schemas.Container, commit bool) error {
 	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
 	if !commit {
-		addr += "?skip=true"
+		addr += "?commit=false"
 	}
 
 	req, err := http.NewRequest("DELETE", "http://"+addr, nil)

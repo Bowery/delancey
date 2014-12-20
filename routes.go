@@ -456,7 +456,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 // DELETE /, Remove service.
 func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
-	skipCommit := req.FormValue("skip") != ""
+	commit := req.FormValue("commit") != "false"
 
 	// Container needs to exist.
 	if currentContainer == nil {
@@ -473,7 +473,7 @@ func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 
 	if Env != "testing" {
-		if skipCommit {
+		if commit {
 			// Get the changes for the image.
 			log.Println("Getting changes for container", currentContainer.ImageID)
 			changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
