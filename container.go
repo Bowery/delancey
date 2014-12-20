@@ -15,6 +15,7 @@ import (
 var (
 	storedContainerPath = filepath.Join(boweryDir, "agent_container.json")
 	containersDir       = filepath.Join(boweryDir, "containers")
+	sshDir              = filepath.Join(boweryDir, "ssh")
 )
 
 // NewContainer creates the remote path for the given container.
@@ -24,7 +25,13 @@ func NewContainer(container *schemas.Container) (*schemas.Container, error) {
 		return nil, err
 	}
 
+	sshPath := filepath.Join(sshDir, container.ID)
+	if err := os.MkdirAll(root, os.ModePerm|os.ModeDir); err != nil {
+		return nil, err
+	}
+
 	container.RemotePath = root
+	container.SSHPath = sshPath
 	return container, nil
 }
 
