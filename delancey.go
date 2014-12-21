@@ -15,8 +15,9 @@ import (
 	loggly "github.com/segmentio/go-loggly"
 )
 
+// Runtime info and clients.
 var (
-	AgentHost, _ = util.GetHost()
+	agentHost, _ = util.GetHost()
 	logClient    = loggly.New(config.LogglyKey, "agent")
 	DockerClient *docker.Client
 	dockerAddr   string
@@ -60,7 +61,7 @@ func main() {
 		"version": VERSION,
 		"arch":    runtime.GOARCH,
 		"os":      runtime.GOOS,
-		"ip":      AgentHost,
+		"ip":      agentHost,
 	})
 
 	server := web.NewServer(":"+port, []web.Handler{
@@ -71,7 +72,7 @@ func main() {
 	err := server.ListenAndServe()
 	if err != nil {
 		go logClient.Error(err.Error(), map[string]interface{}{
-			"ip": AgentHost,
+			"ip": agentHost,
 		})
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

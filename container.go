@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	StoredContainerPath = filepath.Join(BoweryDir, "agent_container.json")
-	ContainersDir       = filepath.Join(BoweryDir, "containers")
+	storedContainerPath = filepath.Join(boweryDir, "agent_container.json")
+	containersDir       = filepath.Join(boweryDir, "containers")
 )
 
 // NewContainer creates the remote path for the given container.
 func NewContainer(container *schemas.Container) (*schemas.Container, error) {
-	root := filepath.Join(ContainersDir, container.ID)
+	root := filepath.Join(containersDir, container.ID)
 	if err := os.MkdirAll(root, os.ModePerm|os.ModeDir); err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func NewContainer(container *schemas.Container) (*schemas.Container, error) {
 
 // LoadContainer reads the stored container info and creates it in memory.
 func LoadContainer() error {
-	file, err := os.Open(StoredContainerPath)
+	file, err := os.Open(storedContainerPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -39,7 +39,7 @@ func LoadContainer() error {
 	}
 	defer file.Close()
 
-	containers := make([]*schemas.Container, 0)
+	var containers []*schemas.Container
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(&containers)
 	if err != nil {
@@ -54,26 +54,26 @@ func LoadContainer() error {
 		}
 	}
 
-	CurrentContainer = container
+	currentContainer = container
 	return nil
 }
 
 // SaveContainer saves the current container.
 func SaveContainer() error {
 	// Use slice so loading can capture null, rather than the zero value.
-	container := []*schemas.Container{CurrentContainer}
+	container := []*schemas.Container{currentContainer}
 	dat, err := json.MarshalIndent(container, "", "  ")
 	if err != nil {
 		return err
 	}
 	buf := bytes.NewBuffer(dat)
 
-	err = os.MkdirAll(BoweryDir, os.ModePerm|os.ModeDir)
+	err = os.MkdirAll(boweryDir, os.ModePerm|os.ModeDir)
 	if err != nil {
 		return err
 	}
 
-	file, err := os.OpenFile(StoredContainerPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(storedContainerPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
