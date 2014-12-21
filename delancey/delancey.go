@@ -11,12 +11,10 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/Bowery/gopackages/config"
+	"github.com/Bowery/gopackages/path"
 	"github.com/Bowery/gopackages/requests"
 	"github.com/Bowery/gopackages/schemas"
 	"github.com/Bowery/gopackages/tar"
@@ -93,6 +91,8 @@ func Create(container *schemas.Container) error {
 
 	container.DockerID = containerRes.Container.DockerID
 	container.RemotePath = containerRes.Container.RemotePath
+	container.SSHPath = containerRes.Container.SSHPath
+	container.ContainerPath = containerRes.Container.ContainerPath
 	container.User = containerRes.Container.User
 	container.Password = containerRes.Container.Password
 	return nil
@@ -141,9 +141,7 @@ func Update(container *schemas.Container, full, name, status string) error {
 		return err
 	}
 
-	// Replace all separators in the name with /.
-	formattedName := path.Join(strings.Split(name, string(filepath.Separator))...)
-	err = writer.WriteField("path", formattedName)
+	err = writer.WriteField("path", path.RelUnix(name))
 	if err != nil {
 		return err
 	}

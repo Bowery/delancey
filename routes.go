@@ -20,6 +20,7 @@ import (
 	"github.com/Bowery/delancey/delancey"
 	"github.com/Bowery/gopackages/config"
 	"github.com/Bowery/gopackages/docker"
+	"github.com/Bowery/gopackages/path"
 	"github.com/Bowery/gopackages/requests"
 	"github.com/Bowery/gopackages/schemas"
 	"github.com/Bowery/gopackages/tar"
@@ -38,7 +39,6 @@ const (
 var (
 	homeDir          = "/home/ubuntu"
 	boweryDir        = filepath.Join(homeDir, ".bowery")
-	sshDir           = filepath.Join(boweryDir, "ssh")
 	currentContainer *schemas.Container
 )
 
@@ -138,21 +138,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		})
 		return
 	}
-
 	image := config.DockerBaseImage + ":" + container.ImageID
-	sshPath := filepath.Join(sshDir, container.ID)
-	err = os.MkdirAll(sshPath, os.ModePerm|os.ModeDir)
-	if err != nil {
-		go logClient.Error(err.Error(), map[string]interface{}{
-			"container": container,
-			"ip":        agentHost,
-		})
-		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-			"status": requests.StatusFailed,
-			"error":  err.Error(),
-		})
-		return
-	}
 
 	if Env != "testing" {
 		// Pull down the containers image.
@@ -246,10 +232,12 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
+
+		container.ContainerPath = "/root/" + filepath.Base(path.RelSystem(container.LocalPath))
 		config := &docker.Config{
 			Volumes: map[string]string{
-				container.RemotePath: "/root",
-				sshPath:              "/root/.ssh",
+				container.RemotePath: container.ContainerPath,
+				container.SSHPath:    "/root/.ssh",
 			},
 			NetworkMode: "host",
 		}
@@ -334,17 +322,17 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	pathType := req.FormValue("pathtype")
-	path := req.FormValue("path")
+	relPath := req.FormValue("path")
 	typ := req.FormValue("type")
 	modeStr := req.FormValue("mode")
-	if path == "" || typ == "" {
+	if relPath == "" || typ == "" {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  "Missing form fields.",
 		})
 		return
 	}
-	path = filepath.Join(currentContainer.RemotePath, filepath.Join(strings.Split(path, "/")...))
+	fullPath := filepath.Join(currentContainer.RemotePath, path.RelSystem(relPath))
 
 	// Container needs to exist.
 	if currentContainer == nil {
@@ -362,7 +350,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 	if typ == "delete" {
 		// Delete path from the service.
-		err = os.RemoveAll(path)
+		err = os.RemoveAll(fullPath)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -373,7 +361,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		// Create/Update path in the service.
 		if pathType == "dir" {
-			err = os.MkdirAll(path, os.ModePerm|os.ModeDir)
+			err = os.MkdirAll(fullPath, os.ModePerm|os.ModeDir)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -397,7 +385,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			defer attach.Close()
 
 			// Ensure parents exist.
-			err = os.MkdirAll(filepath.Dir(path), os.ModePerm|os.ModeDir)
+			err = os.MkdirAll(filepath.Dir(fullPath), os.ModePerm|os.ModeDir)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -406,7 +394,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			dest, err := os.Create(path)
+			dest, err := os.Create(fullPath)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -438,7 +426,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			err = os.Chmod(path, os.FileMode(mode))
+			err = os.Chmod(fullPath, os.FileMode(mode))
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -546,7 +534,7 @@ func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 	// Remove the containers path/ssh and clean up the current container.
 	os.RemoveAll(currentContainer.RemotePath)
-	os.RemoveAll(filepath.Join(sshDir, currentContainer.ID))
+	os.RemoveAll(currentContainer.SSHPath)
 	currentContainer = nil
 	SaveContainer()
 	renderer.JSON(rw, http.StatusOK, map[string]string{
