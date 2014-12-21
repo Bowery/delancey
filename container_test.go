@@ -19,7 +19,7 @@ func TestNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if Ccontainer.RemotePath != filepath.Join(ContainersDir, Ccontainer.ID) {
+	if Ccontainer.RemotePath != filepath.Join(containersDir, Ccontainer.ID) {
 		t.Error("Container path isn't as expected.")
 	}
 }
@@ -30,13 +30,13 @@ func TestSaveContainerNoContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = os.Stat(StoredContainerPath)
+	_, err = os.Stat(storedContainerPath)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
 
 	if err != nil {
-		t.Error("StoredContainerPath doesn't exist when it should.")
+		t.Error("storedContainerPath doesn't exist when it should.")
 	}
 }
 
@@ -46,25 +46,25 @@ func TestLoadContainerNoContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if CurrentContainer != nil {
-		t.Error("CurrentContainer should be nil but isn't.")
+	if currentContainer != nil {
+		t.Error("currentContainer should be nil but isn't.")
 	}
 }
 
 func TestSaveContainer(t *testing.T) {
-	CurrentContainer = Ccontainer
+	currentContainer = Ccontainer
 	err := SaveContainer()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = os.Stat(StoredContainerPath)
+	_, err = os.Stat(storedContainerPath)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
 
 	if err != nil {
-		t.Error("StoredContainerPath doesn't exist when it should.")
+		t.Error("storedContainerPath doesn't exist when it should.")
 	}
 }
 
@@ -74,15 +74,15 @@ func TestLoadContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if CurrentContainer == nil {
-		t.Error("CurrentContainer shouldn't be nil but is.")
+	if currentContainer == nil {
+		t.Error("currentContainer shouldn't be nil but is.")
 	}
 
-	if CurrentContainer.ID != Ccontainer.ID {
-		t.Error("CurrentContainers ID doesn't match what was set.")
+	if currentContainer.ID != Ccontainer.ID {
+		t.Error("currentContainers ID doesn't match what was set.")
 	}
 
-	CurrentContainer = nil
-	os.RemoveAll(StoredContainerPath)
-	os.RemoveAll(ContainersDir)
+	currentContainer = nil
+	os.RemoveAll(storedContainerPath)
+	os.RemoveAll(containersDir)
 }

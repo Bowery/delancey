@@ -1,4 +1,5 @@
 // Copyright 2013-2014 Bowery, Inc.
+
 package main
 
 import (
@@ -35,11 +36,10 @@ const (
 )
 
 var (
-	//HomeDir = os.Getenv(sys.HomeVar)
-	HomeDir          = "/home/ubuntu"
-	BoweryDir        = filepath.Join(HomeDir, ".bowery")
-	SSHDir           = filepath.Join(BoweryDir, "ssh")
-	CurrentContainer *schemas.Container
+	homeDir          = "/home/ubuntu"
+	boweryDir        = filepath.Join(homeDir, ".bowery")
+	sshDir           = filepath.Join(boweryDir, "ssh")
+	currentContainer *schemas.Container
 )
 
 var renderer = render.New(render.Options{
@@ -49,18 +49,18 @@ var renderer = render.New(render.Options{
 
 // List of named routes.
 var Routes = []web.Route{
-	{"GET", "/", IndexHandler, false},
-	{"POST", "/", CreateContainerHandler, false},
-	{"PUT", "/", UploadContainerHandler, false},
-	{"PATCH", "/", UpdateContainerHandler, false},
-	{"DELETE", "/", RemoveContainerHandler, false},
-	{"PUT", "/ssh", UploadSSHHandler, false},
-	{"GET", "/healthz", HealthzHandler, false},
-	{"GET", "/_/state/container", ContainerStateHandler, false},
+	{"GET", "/", indexHandler, false},
+	{"POST", "/", createContainerHandler, false},
+	{"PUT", "/", uploadContainerHandler, false},
+	{"PATCH", "/", updateContainerHandler, false},
+	{"DELETE", "/", removeContainerHandler, false},
+	{"PUT", "/ssh", uploadSSHHandler, false},
+	{"GET", "/healthz", healthzHandler, false},
+	{"GET", "/_/state/container", containerStateHandler, false},
 }
 
 // GET /, Retrieve the containers code.
-func IndexHandler(rw http.ResponseWriter, req *http.Request) {
+func indexHandler(rw http.ResponseWriter, req *http.Request) {
 	var (
 		contents io.Reader
 		err      error
@@ -70,7 +70,7 @@ func IndexHandler(rw http.ResponseWriter, req *http.Request) {
 	gzipWriter.Close()
 
 	// Require a container to exist.
-	if CurrentContainer == nil {
+	if currentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  delancey.ErrNotInUse.Error(),
@@ -79,7 +79,7 @@ func IndexHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Tar the contents of the container.
-	contents, err = tar.Tar(CurrentContainer.RemotePath, []string{})
+	contents, err = tar.Tar(currentContainer.RemotePath, []string{})
 	if err != nil && !os.IsNotExist(err) {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
@@ -98,9 +98,9 @@ func IndexHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 // POST /, Create container.
-func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
+func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	// Only allow one container at a time.
-	if CurrentContainer != nil {
+	if currentContainer != nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  delancey.ErrInUse.Error(),
@@ -122,7 +122,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 	go logClient.Info("creating container", map[string]interface{}{
 		"container": container,
-		"ip":        AgentHost,
+		"ip":        agentHost,
 	})
 
 	// Create new Container.
@@ -130,7 +130,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		go logClient.Error(err.Error(), map[string]interface{}{
 			"container": container,
-			"ip":        AgentHost,
+			"ip":        agentHost,
 		})
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
@@ -140,12 +140,12 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	image := config.DockerBaseImage + ":" + container.ImageID
-	sshPath := filepath.Join(SSHDir, container.ID)
+	sshPath := filepath.Join(sshDir, container.ID)
 	err = os.MkdirAll(sshPath, os.ModePerm|os.ModeDir)
 	if err != nil {
 		go logClient.Error(err.Error(), map[string]interface{}{
 			"container": container,
-			"ip":        AgentHost,
+			"ip":        agentHost,
 		})
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
@@ -161,7 +161,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		if err != nil && !docker.IsTagNotFound(err) {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
-				"ip":        AgentHost,
+				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -179,7 +179,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				go logClient.Error(err.Error(), map[string]interface{}{
 					"container": container,
-					"ip":        AgentHost,
+					"ip":        agentHost,
 				})
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -194,7 +194,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				go logClient.Error(err.Error(), map[string]interface{}{
 					"container": container,
-					"ip":        AgentHost,
+					"ip":        agentHost,
 				})
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -224,7 +224,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
-				"ip":        AgentHost,
+				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -238,7 +238,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
-				"ip":        AgentHost,
+				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -259,7 +259,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
-				"ip":        AgentHost,
+				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -273,7 +273,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
-				"ip":        AgentHost,
+				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -288,7 +288,7 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		container.DockerID = id
 	}
 
-	CurrentContainer = container
+	currentContainer = container
 	SaveContainer()
 	renderer.JSON(rw, http.StatusOK, map[string]interface{}{
 		"status":    requests.StatusCreated,
@@ -297,9 +297,9 @@ func CreateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 // PATCH /, Upload code for container.
-func UploadContainerHandler(rw http.ResponseWriter, req *http.Request) {
+func uploadContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	// Require a container to exist.
-	if CurrentContainer == nil {
+	if currentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  delancey.ErrNotInUse.Error(),
@@ -308,7 +308,7 @@ func UploadContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Untar the tar contents from the body to the containers path.
-	err := tar.Untar(req.Body, CurrentContainer.RemotePath)
+	err := tar.Untar(req.Body, currentContainer.RemotePath)
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
@@ -323,7 +323,7 @@ func UploadContainerHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 // PUT /, Update the FS with a file change.
-func UpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
+func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	// Get the fields required to do the path update.
 	err := req.ParseMultipartForm(httpMaxMem)
 	if err != nil {
@@ -344,10 +344,10 @@ func UpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		})
 		return
 	}
-	path = filepath.Join(CurrentContainer.RemotePath, filepath.Join(strings.Split(path, "/")...))
+	path = filepath.Join(currentContainer.RemotePath, filepath.Join(strings.Split(path, "/")...))
 
 	// Container needs to exist.
-	if CurrentContainer == nil {
+	if currentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  delancey.ErrNotInUse.Error(),
@@ -356,8 +356,8 @@ func UpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	go logClient.Info("updating container", map[string]interface{}{
-		"container": CurrentContainer,
-		"ip":        AgentHost,
+		"container": currentContainer,
+		"ip":        agentHost,
 	})
 
 	if typ == "delete" {
@@ -455,11 +455,11 @@ func UpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 // DELETE /, Remove service.
-func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
+func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	skipCommit := req.FormValue("skip") != ""
 
 	// Container needs to exist.
-	if CurrentContainer == nil {
+	if currentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  delancey.ErrNotInUse.Error(),
@@ -468,15 +468,15 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	go logClient.Info("removing container", map[string]interface{}{
-		"container": CurrentContainer,
-		"ip":        AgentHost,
+		"container": currentContainer,
+		"ip":        agentHost,
 	})
 
 	if Env != "testing" {
 		if skipCommit {
 			// Get the changes for the image.
-			log.Println("Getting changes for container", CurrentContainer.ImageID)
-			changes, err := DockerClient.Changes(CurrentContainer.DockerID, nil)
+			log.Println("Getting changes for container", currentContainer.ImageID)
+			changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
 			if err != nil {
 				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 					"status": requests.StatusFailed,
@@ -484,12 +484,12 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				})
 				return
 			}
-			image := config.DockerBaseImage + ":" + CurrentContainer.ImageID
+			image := config.DockerBaseImage + ":" + currentContainer.ImageID
 
 			// Push changes up.
 			if len(changes) > 0 {
-				log.Println("Committing image changes", CurrentContainer.ImageID)
-				err = DockerClient.CommitImage(CurrentContainer.DockerID, image)
+				log.Println("Committing image changes", currentContainer.ImageID)
+				err = DockerClient.CommitImage(currentContainer.DockerID, image)
 				if err != nil {
 					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 						"status": requests.StatusFailed,
@@ -507,13 +507,13 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 						kenmare.UpdateImage(id)
 					}
 					log.Println("Image push complete", id)
-				}(CurrentContainer.ImageID)
+				}(currentContainer.ImageID)
 			}
 		}
 
 		// Get the container to remove the build image.
-		log.Println("Inspecting container", CurrentContainer.ImageID)
-		container, err := DockerClient.Inspect(CurrentContainer.DockerID)
+		log.Println("Inspecting container", currentContainer.ImageID)
+		container, err := DockerClient.Inspect(currentContainer.DockerID)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -523,8 +523,8 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		// Remove the container and its image.
-		log.Println("Removing container", CurrentContainer.ImageID)
-		err = DockerClient.Remove(CurrentContainer.DockerID)
+		log.Println("Removing container", currentContainer.ImageID)
+		err = DockerClient.Remove(currentContainer.DockerID)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -533,7 +533,7 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		log.Println("Removing runner image", CurrentContainer.ImageID)
+		log.Println("Removing runner image", currentContainer.ImageID)
 		err = DockerClient.RemoveImage(container.Image)
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -545,9 +545,9 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Remove the containers path/ssh and clean up the current container.
-	os.RemoveAll(CurrentContainer.RemotePath)
-	os.RemoveAll(filepath.Join(SSHDir, CurrentContainer.ID))
-	CurrentContainer = nil
+	os.RemoveAll(currentContainer.RemotePath)
+	os.RemoveAll(filepath.Join(sshDir, currentContainer.ID))
+	currentContainer = nil
 	SaveContainer()
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusRemoved,
@@ -555,8 +555,8 @@ func RemoveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 // GET /_/state/container, Return the current container data.
-func ContainerStateHandler(rw http.ResponseWriter, req *http.Request) {
-	data, err := json.Marshal(CurrentContainer)
+func containerStateHandler(rw http.ResponseWriter, req *http.Request) {
+	data, err := json.Marshal(currentContainer)
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
@@ -570,14 +570,14 @@ func ContainerStateHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 // GET /healthz, Return the status of the agent.
-func HealthzHandler(rw http.ResponseWriter, req *http.Request) {
+func healthzHandler(rw http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(rw, "ok")
 }
 
 // PUT /ssh, Accepts ssh tarfile for user auth to their container
-func UploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
+func uploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
 	// Require a container to exist.
-	if CurrentContainer == nil {
+	if currentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
 			"status": requests.StatusFailed,
 			"error":  delancey.ErrNotInUse.Error(),
@@ -586,7 +586,7 @@ func UploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Untar the tar contents from the body to the containers path.
-	err := tar.Untar(req.Body, filepath.Join(SSHDir, CurrentContainer.ID))
+	err := tar.Untar(req.Body, filepath.Join(sshDir, currentContainer.ID))
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,

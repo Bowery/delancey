@@ -140,8 +140,8 @@ func TestCreateContainerCreated(t *testing.T) {
 		t.Error("Should've been failed but didn't")
 	}
 
-	if CurrentContainer == nil {
-		t.Error("CurrentContainer should be set after create")
+	if currentContainer == nil {
+		t.Error("currentContainer should be set after create")
 	}
 }
 
@@ -304,8 +304,8 @@ func TestRemoveContainer(t *testing.T) {
 		t.Error("Remove should've succeeded but didn't")
 	}
 
-	if CurrentContainer != nil {
-		t.Error("CurrentContainer should be unset after remove")
+	if currentContainer != nil {
+		t.Error("currentContainer should be unset after remove")
 	}
 }
 
