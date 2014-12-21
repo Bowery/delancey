@@ -1,5 +1,5 @@
 // Copyright 2013-2014 Bowery, Inc.
-// Contains the main entry point, service handling, and file watching.
+
 package main
 
 import (
