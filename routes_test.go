@@ -54,7 +54,7 @@ func init() {
 }
 
 func TestUploadNoContainer(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UploadContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(uploadContainerHandler))
 	defer server.Close()
 
 	file, err := os.Open(uploadPath)
@@ -82,7 +82,7 @@ func TestUploadNoContainer(t *testing.T) {
 }
 
 func TestCreateContainer(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(CreateContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(createContainerHandler))
 	defer server.Close()
 
 	var buf bytes.Buffer
@@ -113,7 +113,7 @@ func TestCreateContainer(t *testing.T) {
 }
 
 func TestCreateContainerCreated(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(CreateContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(createContainerHandler))
 	defer server.Close()
 
 	var buf bytes.Buffer
@@ -146,7 +146,7 @@ func TestCreateContainerCreated(t *testing.T) {
 }
 
 func TestUpload(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UploadContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(uploadContainerHandler))
 	defer server.Close()
 
 	file, err := os.Open(uploadPath)
@@ -174,7 +174,7 @@ func TestUpload(t *testing.T) {
 }
 
 func TestUpdateDir(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UpdateContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(updateContainerHandler))
 	defer server.Close()
 
 	req, err := newUploadRequest(server.URL, nil, map[string]string{
@@ -210,7 +210,7 @@ func TestUpdateDir(t *testing.T) {
 }
 
 func TestUpdateFile(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UpdateContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(updateContainerHandler))
 	defer server.Close()
 
 	req, err := newUploadRequest(server.URL, map[string]string{
@@ -248,7 +248,7 @@ func TestUpdateFile(t *testing.T) {
 }
 
 func TestUpdateDeleteFile(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(UpdateContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(updateContainerHandler))
 	defer server.Close()
 
 	req, err := newUploadRequest(server.URL, nil, map[string]string{
@@ -284,7 +284,7 @@ func TestUpdateDeleteFile(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(RemoveContainerHandler))
+	server := httptest.NewServer(http.HandlerFunc(removeContainerHandler))
 	defer server.Close()
 
 	res, err := http.Get(server.URL)
