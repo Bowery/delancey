@@ -283,6 +283,25 @@ func TestUpdateDeleteFile(t *testing.T) {
 	}
 }
 
+func TestSaveContainer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(saveContainerHandler))
+	defer server.Close()
+
+	req, err := http.NewRequest("PUT", server.URL+"/containers", nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		t.Error("unexpected result")
+	}
+}
+
 func TestRemoveContainer(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(removeContainerHandler))
 	defer server.Close()

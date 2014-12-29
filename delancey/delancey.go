@@ -227,13 +227,42 @@ func Update(container *schemas.Container, full, name, status string) error {
 	return nil
 }
 
-// Delete removes the container from the instance.
-func Delete(container *schemas.Container, commit bool) error {
+// Save commits and pushes the current container on the instance.
+func Save(container *schemas.Container) error {
 	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
-	if !commit {
-		addr += "?commit=false"
+	req, err := http.NewRequest("PUT", "http://"+addr+"/containers", nil)
+	if err != nil {
+		return err
 	}
 
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		return err
+	}
+
+	if resData.Status != requests.StatusUpdated {
+		// If the error matches return var.
+		if resData.Error() == ErrNotInUse.Error() {
+			return ErrNotInUse
+		}
+
+		return resData
+	}
+
+	return nil
+}
+
+// Delete removes the container from the instance.
+func Delete(container *schemas.Container) error {
+	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
 	req, err := http.NewRequest("DELETE", "http://"+addr, nil)
 	if err != nil {
 		return err

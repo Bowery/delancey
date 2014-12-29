@@ -53,6 +53,7 @@ var Routes = []web.Route{
 	{"POST", "/", createContainerHandler, false},
 	{"PUT", "/", uploadContainerHandler, false},
 	{"PATCH", "/", updateContainerHandler, false},
+	{"PUT", "/containers", saveContainerHandler, false},
 	{"DELETE", "/", removeContainerHandler, false},
 	{"PUT", "/ssh", uploadSSHHandler, false},
 	{"GET", "/healthz", healthzHandler, false},
@@ -311,7 +312,7 @@ func uploadContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 }
 
-// PUT /, Update the FS with a file change.
+// PATCH /, Update the FS with a file change.
 func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	// Get the fields required to do the path update.
 	err := req.ParseMultipartForm(httpMaxMem)
@@ -443,10 +444,61 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 }
 
+// PUT /containers, Save service.
+func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
+	if currentContainer == nil {
+		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  delancey.ErrNotInUse.Error(),
+		})
+		return
+	}
+
+	if Env != "testing" {
+		// Get the changes for the image.
+		log.Println("Getting changes for container", currentContainer.ImageID)
+		changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
+		if err != nil {
+			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+				"status": requests.StatusFailed,
+				"error":  err.Error(),
+			})
+			return
+		}
+		image := config.DockerBaseImage + ":" + currentContainer.ImageID
+
+		// Push changes up.
+		if len(changes) > 0 {
+			log.Println("Committing image changes", currentContainer.ImageID)
+			err = DockerClient.CommitImage(currentContainer.DockerID, image)
+			if err != nil {
+				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+					"status": requests.StatusFailed,
+					"error":  err.Error(),
+				})
+				return
+			}
+
+			// Push in parallel and then send the image to Kenmare to signal an
+			// update completed.
+			go func(id string) {
+				log.Println("Pushing image to hub", id)
+				err := DockerClient.PushImage(image)
+				if err == nil {
+					kenmare.UpdateImage(id)
+				}
+				log.Println("Image push complete", id)
+			}(currentContainer.ImageID)
+		}
+	}
+
+	renderer.JSON(rw, http.StatusOK, map[string]string{
+		"status": requests.StatusUpdated,
+	})
+}
+
 // DELETE /, Remove service.
 func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
-	commit := req.FormValue("commit") != "false"
-
 	// Container needs to exist.
 	if currentContainer == nil {
 		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
@@ -462,44 +514,6 @@ func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 
 	if Env != "testing" {
-		if commit {
-			// Get the changes for the image.
-			log.Println("Getting changes for container", currentContainer.ImageID)
-			changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
-			if err != nil {
-				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-					"status": requests.StatusFailed,
-					"error":  err.Error(),
-				})
-				return
-			}
-			image := config.DockerBaseImage + ":" + currentContainer.ImageID
-
-			// Push changes up.
-			if len(changes) > 0 {
-				log.Println("Committing image changes", currentContainer.ImageID)
-				err = DockerClient.CommitImage(currentContainer.DockerID, image)
-				if err != nil {
-					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-						"status": requests.StatusFailed,
-						"error":  err.Error(),
-					})
-					return
-				}
-
-				// Push in parallel and then send the image to Kenmare to signal an
-				// update completed.
-				go func(id string) {
-					log.Println("Pushing image to hub", id)
-					err := DockerClient.PushImage(image)
-					if err == nil {
-						kenmare.UpdateImage(id)
-					}
-					log.Println("Image push complete", id)
-				}(currentContainer.ImageID)
-			}
-		}
-
 		// Get the container to remove the build image.
 		log.Println("Inspecting container", currentContainer.ImageID)
 		container, err := DockerClient.Inspect(currentContainer.DockerID)

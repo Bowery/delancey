@@ -51,7 +51,7 @@ func TestLoadContainerNoContainer(t *testing.T) {
 	}
 }
 
-func TestSaveContainer(t *testing.T) {
+func TestSaveContainerSuccessful(t *testing.T) {
 	currentContainer = Ccontainer
 	err := SaveContainer()
 	if err != nil {
