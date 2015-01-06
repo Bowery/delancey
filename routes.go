@@ -193,7 +193,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 			// Clean up the container.
 			log.Println("Removing build container", container.ImageID)
-			DockerClient.Remove(id)
+			go DockerClient.Remove(id)
 		}
 
 		// Build the image to use for the container, which sets the password.
