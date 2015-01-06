@@ -143,7 +143,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	image := config.DockerBaseImage + ":" + container.ImageID
 
 	if Env != "testing" {
-		// Pull down the containers image.
+		// Pull the image down to check if it exists.
 		log.Println("Pulling down image", container.ImageID)
 		err = DockerClient.PullImage(image)
 		if err != nil && !docker.IsTagNotFound(err) {
@@ -176,7 +176,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// Commit the empty container.
+			// Commit the empty container to the image name.
 			log.Println("Commit build container to image", container.ImageID)
 			err = DockerClient.CommitImage(id, image)
 			if err != nil {
@@ -191,13 +191,9 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			go func(img string) {
-				log.Println("Pushing image to hub", container.ImageID)
-				DockerClient.PushImage(img)
-
-				log.Println("Removing build container", container.ImageID)
-				DockerClient.Remove(id)
-			}(image)
+			// Clean up the container.
+			log.Println("Removing build container", container.ImageID)
+			go DockerClient.Remove(id)
 		}
 
 		// Build the image to use for the container, which sets the password.
