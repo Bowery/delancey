@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/Bowery/gopackages/config"
 	"github.com/Bowery/gopackages/path"
@@ -332,9 +333,11 @@ func UploadSSH(container *schemas.Container, path string) error {
 }
 
 // Health checks if a delancey instance is running.
-func Health(addr string) error {
+func Health(addr string, timeout time.Duration) error {
+	client := &http.Client{Timeout: timeout}
+
 	addr = net.JoinHostPort(addr, config.DelanceyProdPort)
-	res, err := http.Get("http://" + addr + "/healthz")
+	res, err := client.Get("http://" + addr + "/healthz")
 	if err != nil {
 		return err
 	}
