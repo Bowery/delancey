@@ -475,16 +475,12 @@ func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// Push in parallel and then send the image to Kenmare to signal an
-			// update completed.
-			go func(id string) {
-				log.Println("Pushing image to hub", id)
-				err := DockerClient.PushImage(image)
-				if err == nil {
-					kenmare.UpdateImage(id)
-				}
-				log.Println("Image push complete", id)
-			}(currentContainer.ImageID)
+			log.Println("Pushing image to hub", currentContainer.ImageID)
+			err := DockerClient.PushImage(image)
+			if err == nil {
+				kenmare.UpdateImage(currentContainer.ImageID)
+			}
+			log.Println("Image push complete", currentContainer.ImageID)
 		}
 	}
 
