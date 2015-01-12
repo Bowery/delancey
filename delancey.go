@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/Bowery/gopackages/config"
 	"github.com/Bowery/gopackages/docker"
@@ -69,9 +70,15 @@ func main() {
 			go func(t string) {
 				defer wg.Done()
 				err := io.EOF
+				backoff := util.NewBackoff(0)
 
 				// Keep trying to pull it until successful.
 				for err != nil {
+					if !backoff.Next() {
+						return
+					}
+					<-time.After(backoff.Delay)
+
 					err = DockerClient.PullImage(config.DockerBaseImage + ":" + t)
 					if err != nil {
 						fmt.Fprintln(os.Stderr, err)
