@@ -5,11 +5,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
+	"sync"
 
 	"github.com/Bowery/gopackages/config"
 	"github.com/Bowery/gopackages/docker"
+	"github.com/Bowery/gopackages/docker/quay"
 	"github.com/Bowery/gopackages/util"
 	"github.com/Bowery/gopackages/web"
 	loggly "github.com/segmentio/go-loggly"
@@ -50,6 +53,35 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	// Pull down each tag in parallel.
+	go func() {
+		tags, err := quay.TagList(DockerClient.Auth, config.DockerBaseImage)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		delete(tags, "latest") // Already pulled at this point.
+		var wg sync.WaitGroup
+
+		for tag := range tags {
+			wg.Add(1)
+			go func(t string) {
+				defer wg.Done()
+				err := io.EOF
+
+				// Keep trying to pull it until successful.
+				for err != nil {
+					err = DockerClient.PullImage(config.DockerBaseImage + ":" + t)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, err)
+					}
+				}
+			}(tag)
+		}
+
+		wg.Wait()
+	}()
 
 	port := config.DelanceyProdPort
 	if Env == "development" {
