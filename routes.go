@@ -570,6 +570,26 @@ func uploadSSHHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Ensure files/directories are private.
+	err = filepath.Walk(currentContainer.SSHPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || currentContainer.SSHPath == path {
+			return err
+		}
+
+		if info.IsDir() {
+			return os.Chmod(path, 0700)
+		}
+
+		return os.Chmod(path, 0600)
+	})
+	if err != nil {
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
+	}
+
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusSuccess,
 	})
