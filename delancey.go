@@ -13,6 +13,7 @@ import (
 	"github.com/Bowery/gopackages/util"
 	"github.com/Bowery/gopackages/web"
 	loggly "github.com/segmentio/go-loggly"
+	"github.com/timonv/pusher"
 )
 
 // Runtime info and clients.
@@ -21,12 +22,14 @@ var (
 	logClient    = loggly.New(config.LogglyKey, "agent")
 	DockerClient *docker.Client
 	dockerAddr   string
+	pusherC      *pusherPub.Client
 	Env          string
 	VERSION      string // This is set when release_agent.sh is ran.
 	err          error
 )
 
 func main() {
+	pusherC = pusherPub.NewClient(config.PusherAppID, config.PusherKey, config.PusherSecret)
 	ver := false
 	runtime.GOMAXPROCS(1)
 	flag.StringVar(&dockerAddr, "docker", "unix:///var/run/docker.sock", "Set a custom endpoint for your local Docker service")

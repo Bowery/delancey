@@ -450,6 +450,8 @@ func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// TODO(r-medina): add a defer statement that broachasts that the write is done
+
 	if Env != "testing" {
 		// Get the changes for the image.
 		log.Println("Getting changes for container", currentContainer.ImageID)
@@ -480,6 +482,7 @@ func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			if err == nil {
 				kenmare.UpdateImage(currentContainer.ImageID)
 			}
+
 			log.Println("Image push complete", currentContainer.ImageID)
 		}
 	}
