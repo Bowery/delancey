@@ -20,6 +20,7 @@ import (
 	"github.com/Bowery/delancey/delancey"
 	"github.com/Bowery/gopackages/config"
 	"github.com/Bowery/gopackages/docker"
+	"github.com/Bowery/gopackages/docker/quay"
 	"github.com/Bowery/gopackages/path"
 	"github.com/Bowery/gopackages/requests"
 	"github.com/Bowery/gopackages/schemas"
@@ -145,8 +146,17 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	if Env != "testing" {
 		// Pull the image down to check if it exists.
 		log.Println("Pulling down image", container.ImageID)
-		err = DockerClient.PullImage(image)
-		if err != nil && !docker.IsTagNotFound(err) {
+		progChan := make(chan float64)
+
+		go func() {
+			for prog := range progChan {
+				val := "container:" + strconv.FormatFloat(prog, 'e', -1, 64)
+				go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", container.ID))
+			}
+		}()
+
+		err = quay.PullImage(DockerClient, image, progChan)
+		if err != nil && !quay.IsNotFound(err) {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
 				"ip":        agentHost,
@@ -631,7 +641,7 @@ func pullImageHandler(rw http.ResponseWriter, req *http.Request) {
 		image = config.DockerBaseImage + ":" + image
 	}
 
-	err := DockerClient.PullImage(image)
+	err := DockerClient.PullImage(image, nil)
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,

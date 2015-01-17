@@ -13,12 +13,14 @@ import (
 	"github.com/Bowery/gopackages/util"
 	"github.com/Bowery/gopackages/web"
 	loggly "github.com/segmentio/go-loggly"
+	"github.com/timonv/pusher"
 )
 
 // Runtime info and clients.
 var (
 	agentHost, _ = util.GetHost()
 	logClient    = loggly.New(config.LogglyKey, "agent")
+	pusherC      *pusher.Client
 	DockerClient *docker.Client
 	dockerAddr   string
 	Env          string
@@ -29,6 +31,7 @@ var (
 func main() {
 	ver := false
 	runtime.GOMAXPROCS(1)
+	pusherC = pusher.NewClient(config.PusherAppID, config.PusherKey, config.PusherSecret)
 	flag.StringVar(&dockerAddr, "docker", "unix:///var/run/docker.sock", "Set a custom endpoint for your local Docker service")
 	flag.StringVar(&Env, "env", "production", "If you want to run the agent in development mode uses different ports")
 	flag.BoolVar(&ver, "version", false, "Print the version")
@@ -45,7 +48,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = DockerClient.PullImage(config.DockerBaseImage + ":latest")
+	err = DockerClient.PullImage(config.DockerBaseImage+":latest", nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
