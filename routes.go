@@ -484,9 +484,17 @@ func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				})
 				return
 			}
+			progChan := make(chan float64)
+
+			go func() {
+				for prog := range progChan {
+					val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
+					go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", currentContainer.ID))
+				}
+			}()
 
 			log.Println("Pushing image to hub", currentContainer.ImageID)
-			err := DockerClient.PushImage(image)
+			err := DockerClient.PushImage(image, progChan)
 			if err == nil {
 				kenmare.UpdateImage(currentContainer.ImageID)
 			}
