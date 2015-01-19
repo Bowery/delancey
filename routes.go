@@ -150,7 +150,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 		go func() {
 			for prog := range progChan {
-				val := "container:" + strconv.FormatFloat(prog, 'e', -1, 64)
+				val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
 				go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", container.ID))
 			}
 		}()
