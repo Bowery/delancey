@@ -228,6 +228,56 @@ func Update(container *schemas.Container, full, name, status string) error {
 	return nil
 }
 
+// BatchUpdate updates a list of paths to the instance. Only update/create
+// events should be included.
+func BatchUpdate(container *schemas.Container, paths map[string]string) error {
+	body, gzipWriter, tarWriter := tar.NewTarGZ()
+
+	for full, rel := range paths {
+		info, err := os.Lstat(full)
+		if err != nil {
+			return err
+		}
+
+		err = tar.TarPath(tarWriter, info, full, rel)
+		if err != nil {
+			return err
+		}
+	}
+	tarWriter.Close()
+	gzipWriter.Close()
+
+	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
+	req, err := http.NewRequest("PATCH", "http://"+addr+"/batch", body)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	resData := new(requests.Res)
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(resData)
+	if err != nil {
+		return err
+	}
+
+	if resData.Status != requests.StatusUpdated {
+		// If the error matches return var.
+		if resData.Error() == ErrNotInUse.Error() {
+			return ErrNotInUse
+		}
+
+		return resData
+	}
+
+	return nil
+}
+
 // Save commits and pushes the current container on the instance.
 func Save(container *schemas.Container) error {
 	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)

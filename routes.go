@@ -54,6 +54,7 @@ var Routes = []web.Route{
 	{"POST", "/", createContainerHandler, false},
 	{"PUT", "/", uploadContainerHandler, false},
 	{"PATCH", "/", updateContainerHandler, false},
+	{"PATCH", "/batch", batchUpdateContainerHandler, false},
 	{"PUT", "/containers", saveContainerHandler, false},
 	{"DELETE", "/", removeContainerHandler, false},
 	{"PUT", "/ssh", uploadSSHHandler, false},
@@ -292,7 +293,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 }
 
-// PATCH /, Upload code for container.
+// PUT /, Upload code for container.
 func uploadContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	// Require a container to exist.
 	if currentContainer == nil {
@@ -443,6 +444,38 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
+	}
+
+	renderer.JSON(rw, http.StatusOK, map[string]string{
+		"status": requests.StatusUpdated,
+	})
+}
+
+// PATCH /batch, Update the FS with a list of file changes. Only creates/updates
+// can be done here.
+func batchUpdateContainerHandler(rw http.ResponseWriter, req *http.Request) {
+	// Require a container to exist.
+	if currentContainer == nil {
+		renderer.JSON(rw, http.StatusBadRequest, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  delancey.ErrNotInUse.Error(),
+		})
+		return
+	}
+
+	go logClient.Info("batch updating container", map[string]interface{}{
+		"container": currentContainer,
+		"ip":        agentHost,
+	})
+
+	// Untar the tar contents from the body to the containers path.
+	err := tar.Untar(req.Body, currentContainer.RemotePath)
+	if err != nil {
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
 	}
 
 	renderer.JSON(rw, http.StatusOK, map[string]string{
