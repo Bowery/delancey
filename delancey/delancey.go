@@ -28,6 +28,17 @@ var (
 	ErrNotInUse = errors.New("This Delancey instance is not in use")
 )
 
+// BatchError is used when the batch update encounters an error but
+// just skips it instead of treating it as fatal.
+type BatchError struct {
+	Path string
+	Err  error
+}
+
+func (be *BatchError) Error() string {
+	return be.Err.Error()
+}
+
 // Download retrieves the containers contents on the instance.
 func Download(container *schemas.Container) (io.Reader, error) {
 	addr := net.JoinHostPort(container.Address, config.DelanceyProdPort)
@@ -230,17 +241,27 @@ func Update(container *schemas.Container, full, name, status string) error {
 
 // BatchUpdate updates a list of paths to the instance. Only update/create
 // events should be included.
-func BatchUpdate(container *schemas.Container, paths map[string]string) error {
+func BatchUpdate(container *schemas.Container, paths map[string]string, errorChan chan error) error {
 	body, gzipWriter, tarWriter := tar.NewTarGZ()
 
 	for full, rel := range paths {
 		info, err := os.Lstat(full)
 		if err != nil {
+			if os.IsNotExist(err) {
+				errorChan <- &BatchError{Path: full, Err: err}
+				continue
+			}
+
 			return err
 		}
 
 		err = tar.TarPath(tarWriter, info, full, rel)
 		if err != nil {
+			if os.IsNotExist(err) {
+				errorChan <- &BatchError{Path: full, Err: err}
+				continue
+			}
+
 			return err
 		}
 	}
