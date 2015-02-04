@@ -22,6 +22,17 @@ import (
 	"github.com/Bowery/gopackages/tar"
 )
 
+// Status event types that are used for updating.
+const (
+	CreateStatus       = "create"
+	UpdateStatus       = "update"
+	DeleteStatus       = "delete"
+	UploadStartStatus  = "upload-start"
+	UploadFinishStatus = "upload-finish"
+	BatchStartStatus   = "batch-start"
+	BatchFinishStatus  = "batch-finish"
+)
+
 // Errors that may occur.
 var (
 	ErrInUse    = errors.New("This Delancey instance is in use")
@@ -160,7 +171,7 @@ func Update(container *schemas.Container, full, name, status string) error {
 	}
 
 	// Attach file if update/create status.
-	if status == "update" || status == "create" {
+	if status == UpdateStatus || status == CreateStatus {
 		file, err := os.Open(full)
 		if err != nil {
 			return err
