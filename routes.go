@@ -33,9 +33,14 @@ import (
 const (
 	// 32 MB, same as http.
 	httpMaxMem = 32 << 10
-	// Dockerfile contents to use when creating an image.
-	passwordDockerfile = "FROM {{baseimage}}\nRUN echo '{{user}}:{{password}}' | chpasswd"
+	// Url for the ssh motd text.
+	envMsgUrl = "http://bowery.sh.s3.amazonaws.com/env-msg.txt"
 )
+
+// Dockerfile contents to use when creating an image.
+const passwordDockerfile = `FROM {{baseimage}}
+RUN echo '{{user}}:{{password}}' | chpasswd
+ADD {{motdpath}} /etc/motd`
 
 var (
 	homeDir          = "/home/ubuntu"
@@ -215,6 +220,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
+			"motdpath":  envMsgUrl,
 		})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
