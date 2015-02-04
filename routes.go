@@ -33,9 +33,8 @@ import (
 const (
 	// 32 MB, same as http.
 	httpMaxMem = 32 << 10
-	// Urls for the ssh motd messages
-	newEnvMsgUrl = "http://bowery.sh.s3.amazonaws.com/new-env-msg.txt"
-	envMsgUrl    = "http://bowery.sh.s3.amazonaws.com/env-msg.txt"
+	// Url for the ssh motd text.
+	envMsgUrl = "http://bowery.sh.s3.amazonaws.com/env-msg.txt"
 )
 
 // Dockerfile contents to use when creating an image.
@@ -149,7 +148,6 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	image := config.DockerBaseImage + ":" + container.ImageID
-	motdUrl := envMsgUrl
 
 	if Env != "testing" {
 		// Pull the image down to check if it exists.
@@ -212,7 +210,6 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			// Clean up the container.
 			log.Println("Removing build container", container.ImageID)
 			go DockerClient.Remove(id)
-			motdUrl = newEnvMsgUrl
 		}
 
 		// Build the image to use for the container, which sets the password.
@@ -223,7 +220,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
-			"motdpath":  motdUrl,
+			"motdpath":  envMsgUrl,
 		})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
