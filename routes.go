@@ -357,7 +357,7 @@ func updateContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		"ip":        agentHost,
 	})
 
-	if typ == "delete" {
+	if typ == delancey.DeleteStatus {
 		// Delete path from the service.
 		err = os.RemoveAll(fullPath)
 		if err != nil {
