@@ -34,7 +34,7 @@ const (
 	// 32 MB, same as http.
 	httpMaxMem = 32 << 10
 	// Url for the ssh motd text.
-	envMsgUrl = "http://bowery.sh.s3.amazonaws.com/env-msg.txt"
+	envMsgURL = "http://bowery.sh.s3.amazonaws.com/env-msg.txt"
 )
 
 // Dockerfile contents to use when creating an image.
@@ -220,7 +220,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
-			"motdpath":  envMsgUrl,
+			"motdpath":  envMsgURL,
 		})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
