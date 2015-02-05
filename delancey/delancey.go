@@ -266,7 +266,7 @@ func BatchUpdate(container *schemas.Container, paths map[string]string, errorCha
 			return err
 		}
 
-		err = tar.TarPath(tarWriter, info, full, rel)
+		err = tar.WritePath(tarWriter, info, full, rel)
 		if err != nil {
 			if os.IsNotExist(err) {
 				errorChan <- &BatchError{Path: full, Err: err}
