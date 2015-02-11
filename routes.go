@@ -3,8 +3,6 @@
 package main
 
 import (
-	stdtar "archive/tar"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,14 +31,19 @@ import (
 const (
 	// 32 MB, same as http.
 	httpMaxMem = 32 << 10
-	// Url for the ssh motd text.
-	envMsgURL = "http://bowery.sh.s3.amazonaws.com/env-msg.txt"
 )
 
 // Dockerfile contents to use when creating an image.
 const passwordDockerfile = `FROM {{baseimage}}
 RUN echo '{{user}}:{{password}}' | chpasswd
 ADD {{motdpath}} /etc/motd`
+
+// Dockerfile contents to use when creating the image atop another Dockerfile.
+const sshDockerfile = `FROM {{baseimage}}
+ADD {{sshdinstall}} /tmp/sshd_install
+RUN chmod +x /tmp/sshd_install
+RUN /tmp/sshd_install
+ADD {{sshdconfig}} /etc/ssh/sshd_config`
 
 var (
 	homeDir          = "/home/ubuntu"
@@ -118,9 +121,9 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Get container from body.
-	container := new(schemas.Container)
+	containerReq := new(requests.DockerfileContainerReq)
 	decoder := json.NewDecoder(req.Body)
-	err := decoder.Decode(container)
+	err := decoder.Decode(containerReq)
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
@@ -128,6 +131,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		})
 		return
 	}
+	container := containerReq.Container
 
 	go logClient.Info("creating container", map[string]interface{}{
 		"container": container,
@@ -178,38 +182,63 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			// Create a container using the base.
 			log.Println("Image doesn't exist", container.ImageID)
-			log.Println("Creating build container using base image for", container.ImageID)
-			id, err := DockerClient.Create(new(docker.Config), config.DockerBaseImage, nil)
-			if err != nil {
-				go logClient.Error(err.Error(), map[string]interface{}{
-					"container": container,
-					"ip":        agentHost,
-				})
-				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-					"status": requests.StatusFailed,
-					"error":  err.Error(),
-				})
-				return
-			}
 
-			// Commit the empty container to the image name.
-			log.Println("Commit build container to image", container.ImageID)
-			err = DockerClient.CommitImage(id, image)
-			if err != nil {
-				go logClient.Error(err.Error(), map[string]interface{}{
-					"container": container,
-					"ip":        agentHost,
-				})
-				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-					"status": requests.StatusFailed,
-					"error":  err.Error(),
-				})
-				return
-			}
+			// If no Dockerfile was given, just create the image from the base.
+			if containerReq.Dockerfile == "" {
+				err := createImage(container.ImageID, image, config.DockerBaseImage)
+				if err != nil {
+					go logClient.Error(err.Error(), map[string]interface{}{
+						"container": container,
+						"ip":        agentHost,
+					})
+					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+						"status": requests.StatusFailed,
+						"error":  err.Error(),
+					})
+					return
+				}
+			} else {
+				// Use the given Dockerfile as the base image.
+				log.Println("Building Dockerfile to image for", container.ImageID)
+				input, err := createImageInput(containerReq.Dockerfile, nil)
+				if err == nil {
+					_, err = DockerClient.BuildImage(input, "", image)
+				}
+				if err != nil {
+					go logClient.Error(err.Error(), map[string]interface{}{
+						"container": container,
+						"ip":        agentHost,
+					})
+					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+						"status": requests.StatusFailed,
+						"error":  err.Error(),
+					})
+					return
+				}
 
-			// Clean up the container.
-			log.Println("Removing build container", container.ImageID)
-			go DockerClient.Remove(id)
+				// Now we need to ensure sshd is installed and configured correctly.
+				// To do this we build the image using itself as the base.
+				log.Println("Building Dockerfile with SSH for", container.ImageID)
+				input, err = createImageInput(sshDockerfile, map[string]string{
+					"baseimage":   image,
+					"sshdinstall": config.SSHInstallAddr,
+					"sshdconfig":  config.SSHConfigAddr,
+				})
+				if err == nil {
+					_, err = DockerClient.BuildImage(input, "", image)
+				}
+				if err != nil {
+					go logClient.Error(err.Error(), map[string]interface{}{
+						"container": container,
+						"ip":        agentHost,
+					})
+					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+						"status": requests.StatusFailed,
+						"error":  err.Error(),
+					})
+					return
+				}
+			}
 		}
 
 		// Build the image to use for the container, which sets the password.
@@ -220,7 +249,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
-			"motdpath":  envMsgURL,
+			"motdpath":  config.EnvMessageAddr,
 		})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
@@ -707,36 +736,4 @@ func pullImageHandler(rw http.ResponseWriter, req *http.Request) {
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusSuccess,
 	})
-}
-
-// createImageInput creates a tar reader using a template as the Dockerfile.
-func createImageInput(tmpl string, vars map[string]string) (io.Reader, error) {
-	// Do replaces in the tmpl.
-	if vars != nil {
-		for key, value := range vars {
-			tmpl = strings.Replace(tmpl, "{{"+key+"}}", value, -1)
-		}
-	}
-
-	// Create the tar writer and the header for the Dockerfile.
-	var buf bytes.Buffer
-	tarW := stdtar.NewWriter(&buf)
-	header := &stdtar.Header{
-		Name: "Dockerfile",
-		Size: int64(len(tmpl)),
-		Mode: 0644,
-	}
-
-	// Write the entry to the tar writer closing afterwards.
-	err = tarW.WriteHeader(header)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(tarW, strings.NewReader(tmpl))
-	if err != nil {
-		return nil, err
-	}
-
-	return &buf, tarW.Close()
 }

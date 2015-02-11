@@ -81,11 +81,17 @@ func Download(container *schemas.Container) (io.Reader, error) {
 	return body, err
 }
 
-// Create creates the given container on the instance.
-func Create(container *schemas.Container) error {
+// Create creates the given container on the instance using a dockerfile
+// as the base if given.
+func Create(container *schemas.Container, dockerfile string) error {
 	var body bytes.Buffer
+	reqContainer := &requests.DockerfileContainerReq{
+		Container:  container,
+		Dockerfile: dockerfile,
+	}
+
 	encoder := json.NewEncoder(&body)
-	err := encoder.Encode(container)
+	err := encoder.Encode(reqContainer)
 	if err != nil {
 		return err
 	}
