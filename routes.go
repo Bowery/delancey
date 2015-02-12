@@ -160,8 +160,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 		go func() {
 			for prog := range progChan {
-				val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
-				go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", container.ID))
+				sendProgress("environment", prog, fmt.Sprintf("container-%s", container.ID))
 			}
 		}()
 
@@ -528,47 +527,56 @@ func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if Env != "testing" {
-		// Get the changes for the image.
-		log.Println("Getting changes for container", currentContainer.ImageID)
-		changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
-		if err != nil {
-			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-				"status": requests.StatusFailed,
-				"error":  err.Error(),
-			})
-			return
-		}
-		image := config.DockerBaseImage + ":" + currentContainer.ImageID
-
-		// Push changes up.
-		if len(changes) > 0 {
-			log.Println("Committing image changes", currentContainer.ImageID)
-			err = DockerClient.CommitImage(currentContainer.DockerID, image)
-			if err != nil {
-				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-					"status": requests.StatusFailed,
-					"error":  err.Error(),
-				})
-				return
-			}
-			progChan := make(chan float64)
-
-			go func() {
-				for prog := range progChan {
-					val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
-					go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", currentContainer.ID))
-				}
-			}()
-
-			log.Println("Pushing image to hub", currentContainer.ImageID)
-			err := DockerClient.PushImage(image, progChan)
-			if err == nil {
-				kenmare.UpdateImage(currentContainer.ImageID)
-			}
-			log.Println("Image push complete", currentContainer.ImageID)
-		}
+	if Env == "testing" {
+		renderer.JSON(rw, http.StatusOK, map[string]string{
+			"status": requests.StatusUpdated,
+		})
+		return
 	}
+
+	// Get the changes for the image.
+	log.Println("Getting changes for container", currentContainer.ImageID)
+	changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
+	if err != nil {
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
+	}
+	image := config.DockerBaseImage + ":" + currentContainer.ImageID
+
+	// No changes made so just return successfully.
+	if len(changes) <= 0 {
+		renderer.JSON(rw, http.StatusOK, map[string]string{
+			"status": requests.StatusUpdated,
+		})
+		return
+	}
+
+	log.Println("Committing image changes", currentContainer.ImageID)
+	err = DockerClient.CommitImage(currentContainer.DockerID, image)
+	if err != nil {
+		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+			"status": requests.StatusFailed,
+			"error":  err.Error(),
+		})
+		return
+	}
+	progChan := make(chan float64)
+
+	go func() {
+		for prog := range progChan {
+			sendProgress("environment", prog, fmt.Sprintf("container-%s", currentContainer.ID))
+		}
+	}()
+
+	log.Println("Pushing image to hub", currentContainer.ImageID)
+	err = DockerClient.PushImage(image, progChan)
+	if err == nil {
+		kenmare.UpdateImage(currentContainer.ImageID)
+	}
+	log.Println("Image push complete", currentContainer.ImageID)
 
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusUpdated,
@@ -736,4 +744,11 @@ func pullImageHandler(rw http.ResponseWriter, req *http.Request) {
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusSuccess,
 	})
+}
+
+// sendProgress sends a progress event to the channel using the step and progress
+// as the data formatted step:prog.
+func sendProgress(step string, prog float64, channel string) error {
+	val := step + ":" + strconv.FormatFloat(prog, 'e', -1, 64)
+	return pusherC.Publish(val, "progress", channel)
 }
