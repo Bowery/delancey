@@ -187,6 +187,10 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			// Create a container using the base.
 			log.Println("Image doesn't exist", container.ImageID)
 
+			// Set the prev since there was no progress done.
+			prevProg = 1 / steps
+			sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
+
 			// If no Dockerfile was given, just create the image from the base.
 			if containerReq.Dockerfile == "" {
 				err := createImage(container.ImageID, image, config.DockerBaseImage)
@@ -204,9 +208,19 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				prevProg = (1 / steps) + prevProg
 				sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 			} else {
+				progChan := make(chan float64)
+				lastProg := prevProg
+
+				go func() {
+					for prog := range progChan {
+						prevProg = ((prog / 2) / steps) + lastProg
+						sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
+					}
+				}()
+
 				// Use the given Dockerfile as the base image.
 				log.Println("Building Dockerfile to image for", container.ImageID)
-				_, err := buildImage(containerReq.Dockerfile, nil, image, nil)
+				_, err := buildImage(containerReq.Dockerfile, nil, image, progChan)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
 						"container": container,
@@ -218,6 +232,15 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 					})
 					return
 				}
+				progChan = make(chan float64)
+				lastProg = prevProg
+
+				go func() {
+					for prog := range progChan {
+						prevProg = ((prog) / steps) + lastProg
+						sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
+					}
+				}()
 
 				// Now we need to ensure sshd is installed and configured correctly.
 				// To do this we build the image using itself as the base.
@@ -226,7 +249,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 					"baseimage":   image,
 					"sshdinstall": config.SSHInstallAddr,
 					"sshdconfig":  config.SSHConfigAddr,
-				}, image, nil)
+				}, image, progChan)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
 						"container": container,
@@ -238,8 +261,6 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 					})
 					return
 				}
-				prevProg = (1 / steps) + prevProg
-				sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 			}
 		}
 		user := "root"
