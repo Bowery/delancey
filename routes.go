@@ -152,15 +152,20 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	image := config.DockerBaseImage + ":" + container.ImageID
+	steps := float64(5) // Number of steps in the create progress.
 
 	if Env != "testing" {
 		// Pull the image down to check if it exists.
 		log.Println("Pulling down image", container.ImageID)
 		progChan := make(chan float64)
+		prevProg := float64(0)
 
 		go func() {
 			for prog := range progChan {
-				sendProgress("environment", prog, fmt.Sprintf("container-%s", container.ID))
+				progVal := float64(prog) / steps
+				prevProg = progVal
+
+				sendProgress("environment", progVal, fmt.Sprintf("container-%s", container.ID))
 			}
 		}()
 
@@ -196,13 +201,12 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 					})
 					return
 				}
+				prevProg = (1 / steps) + prevProg
+				sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 			} else {
 				// Use the given Dockerfile as the base image.
 				log.Println("Building Dockerfile to image for", container.ImageID)
-				input, err := createImageInput(containerReq.Dockerfile, nil)
-				if err == nil {
-					_, err = DockerClient.BuildImage(input, "", image)
-				}
+				_, err := buildImage(containerReq.Dockerfile, nil, image, nil)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
 						"container": container,
@@ -218,14 +222,11 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				// Now we need to ensure sshd is installed and configured correctly.
 				// To do this we build the image using itself as the base.
 				log.Println("Building Dockerfile with SSH for", container.ImageID)
-				input, err = createImageInput(sshDockerfile, map[string]string{
+				_, err = buildImage(sshDockerfile, map[string]string{
 					"baseimage":   image,
 					"sshdinstall": config.SSHInstallAddr,
 					"sshdconfig":  config.SSHConfigAddr,
-				})
-				if err == nil {
-					_, err = DockerClient.BuildImage(input, "", image)
-				}
+				}, image, nil)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
 						"container": container,
@@ -237,19 +238,21 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 					})
 					return
 				}
+				prevProg = (1 / steps) + prevProg
+				sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 			}
 		}
-
-		// Build the image to use for the container, which sets the password.
-		log.Println("Creating Dockerfile input", container.ImageID)
 		user := "root"
 		password := uuid.New()
-		input, err := createImageInput(passwordDockerfile, map[string]string{
+
+		// Build the image to use for the container, which sets the password.
+		log.Println("Creating runner image for container", container.ImageID)
+		image, err := buildImage(passwordDockerfile, map[string]string{
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
 			"motdpath":  config.EnvMessageAddr,
-		})
+		}, config.DockerBaseImage, nil)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
 				"container": container,
@@ -261,20 +264,8 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
-
-		log.Println("Creating runner image for container", container.ImageID)
-		image, err = DockerClient.BuildImage(input, "", config.DockerBaseImage)
-		if err != nil {
-			go logClient.Error(err.Error(), map[string]interface{}{
-				"container": container,
-				"ip":        agentHost,
-			})
-			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-				"status": requests.StatusFailed,
-				"error":  err.Error(),
-			})
-			return
-		}
+		prevProg = (1 / steps) + prevProg
+		sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 
 		container.ContainerPath = "/root/" + filepath.Base(path.RelSystem(container.LocalPath))
 		config := &docker.Config{
@@ -298,6 +289,8 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
+		prevProg = (1 / steps) + prevProg
+		sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 
 		log.Println("Starting container", container.ImageID)
 		err = DockerClient.Start(config, id)
@@ -312,7 +305,9 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
-		log.Println("Container started", container.ImageID)
+		log.Println("Container started", id, container.ImageID)
+		prevProg = (1 / steps) + prevProg
+		sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 
 		container.User = user
 		container.Password = password
