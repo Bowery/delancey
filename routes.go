@@ -157,7 +157,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		go func() {
 			for prog := range progChan {
 				val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
-				pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", container.ID))
+				go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", container.ID))
 			}
 		}()
 
@@ -284,7 +284,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
-		log.Println("Container started", id, container.ImageID)
+		log.Println("Container started", container.ImageID)
 
 		container.User = user
 		container.Password = password
@@ -499,76 +499,47 @@ func saveContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if Env == "testing" {
-		renderer.JSON(rw, http.StatusOK, map[string]string{
-			"status": requests.StatusUpdated,
-		})
-		return
-	}
-
-	// Get the changes for the image.
-	log.Println("Getting changes for container", currentContainer.ImageID)
-	changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
-	if err != nil {
-		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-			"status": requests.StatusFailed,
-			"error":  err.Error(),
-		})
-		return
-	}
-	image := config.DockerBaseImage + ":" + currentContainer.ImageID
-
-	// No changes made so just return successfully.
-	if len(changes) <= 0 {
-		renderer.JSON(rw, http.StatusOK, map[string]string{
-			"status": requests.StatusUpdated,
-		})
-		return
-	}
-	progChan := make(chan float64)
-	prevProg := float64(0)
-
-	// Get events for merge committing.
-	go func() {
-		for prog := range progChan {
-			prog = prog / 2
-			prevProg = prog
-
-			val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
-			pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", currentContainer.ID))
+	if Env != "testing" {
+		// Get the changes for the image.
+		log.Println("Getting changes for container", currentContainer.ImageID)
+		changes, err := DockerClient.Changes(currentContainer.DockerID, nil)
+		if err != nil {
+			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+				"status": requests.StatusFailed,
+				"error":  err.Error(),
+			})
+			return
 		}
-	}()
+		image := config.DockerBaseImage + ":" + currentContainer.ImageID
 
-	log.Println("Committing image changes", currentContainer.ImageID)
-	err = quay.CommitImage(DockerClient, currentContainer.DockerID, image, progChan)
-	if err != nil {
-		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-			"status": requests.StatusFailed,
-			"error":  err.Error(),
-		})
-		return
-	}
-	progChan = make(chan float64)
-	if prevProg < 0.5 {
-		prevProg = 0.5
-	}
+		// Push changes up.
+		if len(changes) > 0 {
+			log.Println("Committing image changes", currentContainer.ImageID)
+			err = DockerClient.CommitImage(currentContainer.DockerID, image)
+			if err != nil {
+				renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+					"status": requests.StatusFailed,
+					"error":  err.Error(),
+				})
+				return
+			}
+			progChan := make(chan float64)
 
-	// Get events for pushing.
-	go func() {
-		for prog := range progChan {
-			prog = (prog / 2) + prevProg
+			go func() {
+				for prog := range progChan {
+					val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
+					go pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", currentContainer.ID))
+				}
+			}()
 
-			val := "environment:" + strconv.FormatFloat(prog, 'e', -1, 64)
-			pusherC.Publish(val, "progress", fmt.Sprintf("container-%s", currentContainer.ID))
+			log.Println("Pushing image to hub", currentContainer.ImageID)
+			err := DockerClient.PushImage(image, progChan)
+			if err == nil {
+				kenmare.UpdateImage(currentContainer.ImageID)
+			}
+			log.Println("Image push complete", currentContainer.ImageID)
 		}
-	}()
-
-	log.Println("Pushing image to hub", currentContainer.ImageID)
-	err = DockerClient.PushImage(image, progChan)
-	if err == nil {
-		kenmare.UpdateImage(currentContainer.ImageID)
 	}
-	log.Println("Image push complete", currentContainer.ImageID)
 
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusUpdated,
