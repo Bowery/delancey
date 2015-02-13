@@ -688,7 +688,14 @@ func healthzHandler(rw http.ResponseWriter, req *http.Request) {
 
 // GET /_/state/container, Return the current container data.
 func containerStateHandler(rw http.ResponseWriter, req *http.Request) {
-	data, err := json.Marshal(currentContainer)
+	containerCopy := *currentContainer
+
+	containerCopy.SSHPath = ""
+	containerCopy.LocalPath = ""
+	containerCopy.User = ""
+	containerCopy.Password = ""
+
+	data, err := json.Marshal(containerCopy)
 	if err != nil {
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 			"status": requests.StatusFailed,
