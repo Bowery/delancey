@@ -220,7 +220,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 				// Use the given Dockerfile as the base image.
 				log.Println("Building Dockerfile to image for", container.ImageID)
-				_, err := buildImage(containerReq.Dockerfile, nil, image, progChan)
+				_, err := buildImage(true, containerReq.Dockerfile, nil, image, progChan)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
 						"container": container,
@@ -245,7 +245,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				// Now we need to ensure sshd is installed and configured correctly.
 				// To do this we build the image using itself as the base.
 				log.Println("Building Dockerfile with SSH for", container.ImageID)
-				_, err = buildImage(sshDockerfile, map[string]string{
+				_, err = buildImage(false, sshDockerfile, map[string]string{
 					"baseimage":   image,
 					"sshdinstall": config.SSHInstallAddr,
 					"sshdconfig":  config.SSHConfigAddr,
@@ -268,7 +268,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 		// Build the image to use for the container, which sets the password.
 		log.Println("Creating runner image for container", container.ImageID)
-		image, err := buildImage(passwordDockerfile, map[string]string{
+		image, err := buildImage(false, passwordDockerfile, map[string]string{
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
