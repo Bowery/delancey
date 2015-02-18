@@ -712,6 +712,9 @@ func healthzHandler(rw http.ResponseWriter, req *http.Request) {
 
 // GET /_/state/container, Return the current container data.
 func containerStateHandler(rw http.ResponseWriter, req *http.Request) {
+	if currentContainer == nil {
+		rw.Write([]byte("Nothing"))
+	}
 	containerCopy := *currentContainer
 
 	containerCopy.SSHPath = ""
