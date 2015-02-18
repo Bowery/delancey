@@ -35,7 +35,16 @@ func createImage(imageID, image, baseImage string) error {
 
 // buildImage builds an image for the repo from a given Dockerfile, sending step
 // progress across the channel.
-func buildImage(dockerfile string, vars map[string]string, repo string, progress chan float64) (string, error) {
+func buildImage(strip bool, dockerfile string, vars map[string]string, repo string, progress chan float64) (string, error) {
+	if strip {
+		fileContents, err := stripInstructions(strings.NewReader(dockerfile))
+		if err != nil {
+			return "", err
+		}
+
+		dockerfile = fileContents.String()
+	}
+
 	input, err := createImageInput(dockerfile, vars)
 	if err != nil {
 		return "", err
@@ -45,12 +54,7 @@ func buildImage(dockerfile string, vars map[string]string, repo string, progress
 		return DockerClient.BuildImage(input, "", repo, nil)
 	}
 
-	fileContents, err := stripInstructions(strings.NewReader(dockerfile))
-	if err != nil {
-		return "", err
-	}
-
-	steps, err := docker.ParseDockerfile(fileContents)
+	steps, err := docker.ParseDockerfile(strings.NewReader(dockerfile))
 	if err != nil {
 		return "", err
 	}
@@ -100,7 +104,7 @@ func createImageInput(tmpl string, vars map[string]string) (io.Reader, error) {
 
 // stripInstructions reads Dockerfile input and strips unsafe or disallowed
 // instructions. It also only allows URL based sources for the ADD instruction.
-func stripInstructions(contents io.Reader) (io.Reader, error) {
+func stripInstructions(contents io.Reader) (*bytes.Buffer, error) {
 	var buf bytes.Buffer
 	nodes, err := docker.ParseDockerfile(contents)
 	if err != nil {
