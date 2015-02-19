@@ -89,7 +89,7 @@ func createImageInput(tmpl string, vars map[string]string) (io.Reader, error) {
 	}
 
 	// Write the entry to the tar writer closing afterwards.
-	err = tarW.WriteHeader(header)
+	err := tarW.WriteHeader(header)
 	if err != nil {
 		return nil, err
 	}

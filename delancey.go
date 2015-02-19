@@ -25,10 +25,10 @@ var (
 	dockerAddr   string
 	Env          string
 	VERSION      string // This is set when release_agent.sh is ran.
-	err          error
 )
 
 func main() {
+	var err error
 	ver := false
 	runtime.GOMAXPROCS(1)
 	pusherC = pusher.NewClient(config.PusherAppID, config.PusherKey, config.PusherSecret)
@@ -72,7 +72,7 @@ func main() {
 	}, Routes)
 	server.AuthHandler = &web.AuthHandler{Auth: web.DefaultAuthHandler}
 
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		go logClient.Error(err.Error(), map[string]interface{}{
 			"ip": agentHost,
