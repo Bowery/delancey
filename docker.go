@@ -33,19 +33,22 @@ func createImage(imageID, image, baseImage string) error {
 	return nil
 }
 
-// buildImage builds an image for the repo from a given Dockerfile, sending step
-// progress across the channel.
-func buildImage(strip bool, dockerfile string, vars map[string]string, repo string, progress chan float64) (string, error) {
-	if strip {
+// buildImage builds an image for the repo from a list of paths that should
+// include a Dockerfile. If strip is true, the Dockerfile found is stripped of
+// unsafe instructions. Progress is sent across the given channel.
+func buildImage(strip bool, paths map[string]string, vars map[string]string, repo string, progress chan float64) (string, error) {
+	dockerfile, ok := paths["Dockerfile"]
+	if strip && ok {
 		fileContents, err := stripInstructions(strings.NewReader(dockerfile))
 		if err != nil {
 			return "", err
 		}
 
-		dockerfile = fileContents.String()
+		paths["Dockerfile"] = fileContents.String()
+		dockerfile = paths["Dockerfile"]
 	}
 
-	input, err := createImageInput(dockerfile, vars)
+	input, err := createImageInput(paths, vars)
 	if err != nil {
 		return "", err
 	}
@@ -70,33 +73,33 @@ func buildImage(strip bool, dockerfile string, vars map[string]string, repo stri
 	return DockerClient.BuildImage(input, "", repo, progChan)
 }
 
-// createImageInput creates a tar reader using a template as the Dockerfile.
-func createImageInput(tmpl string, vars map[string]string) (io.Reader, error) {
-	// Do replaces in the tmpl.
-	if vars != nil {
-		for key, value := range vars {
-			tmpl = strings.Replace(tmpl, "{{"+key+"}}", value, -1)
-		}
-	}
-
-	// Create the tar writer and the header for the Dockerfile.
+// createImageInput creates a tar reader using the given templates as files.
+// The given vars are replaced in all the templates encountered.
+func createImageInput(tmpls, vars map[string]string) (io.Reader, error) {
 	var buf bytes.Buffer
 	tarW := stdtar.NewWriter(&buf)
 	header := &stdtar.Header{
-		Name: "Dockerfile",
-		Size: int64(len(tmpl)),
 		Mode: 0644,
 	}
 
-	// Write the entry to the tar writer closing afterwards.
-	err := tarW.WriteHeader(header)
-	if err != nil {
-		return nil, err
-	}
+	for path, tmpl := range tmpls {
+		if vars != nil {
+			for key, val := range vars {
+				tmpl = strings.Replace(tmpl, "{{"+key+"}}", val, -1)
+			}
+		}
 
-	_, err = io.Copy(tarW, strings.NewReader(tmpl))
-	if err != nil {
-		return nil, err
+		header.Name = path
+		header.Size = int64(len(tmpl))
+		err := tarW.WriteHeader(header)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = io.Copy(tarW, strings.NewReader(tmpl))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &buf, tarW.Close()
