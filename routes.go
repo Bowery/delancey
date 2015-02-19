@@ -36,7 +36,10 @@ const (
 // Dockerfile contents to use when creating an image.
 const passwordDockerfile = `FROM {{baseimage}}
 RUN echo '{{user}}:{{password}}' | chpasswd
-ADD {{motdpath}} /etc/motd`
+ADD {{motdpath}} /etc/motd
+COPY bowery-env bowery-vars /tmp/
+RUN cat /tmp/bowery-env >> /etc/environment; rm /tmp/bowery-env
+RUN cat /tmp/bowery-vars >> /etc/profile; rm /tmp/bowery-vars`
 
 // Dockerfile contents to use when creating the image atop another Dockerfile.
 const sshDockerfile = `FROM {{baseimage}}
@@ -220,7 +223,9 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 				// Use the given Dockerfile as the base image.
 				log.Println("Building Dockerfile to image for", container.ImageID)
-				_, err := buildImage(true, containerReq.Dockerfile, nil, image, progChan)
+				_, err := buildImage(true, map[string]string{
+					"Dockerfile": containerReq.Dockerfile,
+				}, nil, image, progChan)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
 						"container": container,
@@ -245,7 +250,9 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				// Now we need to ensure sshd is installed and configured correctly.
 				// To do this we build the image using itself as the base.
 				log.Println("Building Dockerfile with SSH for", container.ImageID)
-				_, err = buildImage(false, sshDockerfile, map[string]string{
+				_, err = buildImage(false, map[string]string{
+					"Dockerfile": sshDockerfile,
+				}, map[string]string{
 					"baseimage":   image,
 					"sshdinstall": config.SSHInstallAddr,
 					"sshdconfig":  config.SSHConfigAddr,
@@ -263,12 +270,40 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				}
 			}
 		}
+
+		// Inspect the image to get any env vars.
+		inspectedBase, err := DockerClient.InspectImage(image)
+		if err != nil {
+			go logClient.Error(err.Error(), map[string]interface{}{
+				"container": container,
+				"ip":        agentHost,
+			})
+			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
+				"status": requests.StatusFailed,
+				"error":  err.Error(),
+			})
+			return
+		}
 		user := "root"
 		password := uuid.New()
+		envVars := ""
+		envVarsExport := ""
+
+		// Copy the env vars to use as a file in the image build.
+		if inspectedBase.Config.Env != nil {
+			envVars = strings.Join(inspectedBase.Config.Env, "\n")
+			for _, kv := range inspectedBase.Config.Env {
+				envVarsExport += "export " + kv + "\n"
+			}
+		}
 
 		// Build the image to use for the container, which sets the password.
 		log.Println("Creating runner image for container", container.ImageID)
-		image, err := buildImage(false, passwordDockerfile, map[string]string{
+		image, err := buildImage(false, map[string]string{
+			"Dockerfile":  passwordDockerfile,
+			"bowery-env":  envVars,
+			"bowery-vars": envVarsExport,
+		}, map[string]string{
 			"baseimage": image,
 			"user":      user,
 			"password":  password,
