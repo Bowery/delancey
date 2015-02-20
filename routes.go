@@ -155,7 +155,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	image := config.DockerBaseImage + ":" + container.ImageID
-	steps := float64(5) // Number of steps in the create progress.
+	steps := float64(4) // Number of steps in the create progress.
 
 	if Env != "testing" {
 		// Pull the image down to check if it exists.
@@ -345,8 +345,6 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
-		prevProg = (1 / steps) + prevProg
-		sendProgress("environment", prevProg, fmt.Sprintf("container-%s", container.ID))
 
 		log.Println("Starting container", container.ImageID)
 		err = DockerClient.Start(config, id)
