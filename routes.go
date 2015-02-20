@@ -330,6 +330,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				container.SSHPath:    "/root/.ssh",
 			},
 			NetworkMode: "host",
+			Privileged:  true,
 		}
 
 		log.Println("Creating container", container.ImageID)
