@@ -53,12 +53,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	port := config.DelanceyProdPort
-	if Env == "development" {
-		port = config.DelanceyDevPort
-	}
-	LoadContainer()
+	currentContainer, _ = LoadContainer()
 
 	go logClient.Info("agent starting", map[string]interface{}{
 		"version": VERSION,
@@ -66,6 +61,11 @@ func main() {
 		"os":      runtime.GOOS,
 		"ip":      agentHost,
 	})
+
+	port := config.DelanceyProdPort
+	if Env == "development" {
+		port = config.DelanceyDevPort
+	}
 
 	server := web.NewServer(":"+port, []web.Handler{
 		new(web.SlashHandler),
