@@ -21,7 +21,6 @@ import (
 	"github.com/Bowery/gopackages/docker/quay"
 	"github.com/Bowery/gopackages/path"
 	"github.com/Bowery/gopackages/requests"
-	"github.com/Bowery/gopackages/schemas"
 	"github.com/Bowery/gopackages/tar"
 	"github.com/Bowery/gopackages/web"
 	"github.com/Bowery/kenmare/kenmare"
@@ -49,9 +48,8 @@ RUN /tmp/sshd_install
 ADD {{sshdconfig}} /etc/ssh/sshd_config`
 
 var (
-	homeDir          = "/home/ubuntu"
-	boweryDir        = filepath.Join(homeDir, ".bowery")
-	currentContainer *schemas.Container
+	homeDir   = "/home/ubuntu"
+	boweryDir = filepath.Join(homeDir, ".bowery")
 )
 
 var renderer = render.New(render.Options{
@@ -134,18 +132,18 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		})
 		return
 	}
-	container := containerReq.Container
+	scontainer := containerReq.Container
 
 	go logClient.Info("creating container", map[string]interface{}{
-		"container": container,
+		"container": scontainer,
 		"ip":        agentHost,
 	})
 
 	// Create new Container.
-	_, err = NewContainer(container)
+	container, err := NewContainer(scontainer)
 	if err != nil {
 		go logClient.Error(err.Error(), map[string]interface{}{
-			"container": container,
+			"container": scontainer,
 			"ip":        agentHost,
 		})
 		renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -156,6 +154,20 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	image := config.DockerBaseImage + ":" + container.ImageID
 	steps := float64(4) // Number of steps in the create progress.
+
+	// Clean up if a failure occured.
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		if Env != "testing" && container.DockerID != "" {
+			container.DeleteDocker()
+		}
+		container.DeletePaths()
+		currentContainer = nil
+		currentContainer.Save()
+	}()
 
 	if Env != "testing" {
 		// Pull the image down to check if it exists.
@@ -175,7 +187,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		err = quay.PullImage(DockerClient, image, progChan)
 		if err != nil && !quay.IsNotFound(err) {
 			go logClient.Error(err.Error(), map[string]interface{}{
-				"container": container,
+				"container": scontainer,
 				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -196,10 +208,10 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 			// If no Dockerfile was given, just create the image from the base.
 			if containerReq.Dockerfile == "" {
-				err := createImage(container.ImageID, image, config.DockerBaseImage)
+				err = createImage(container.ImageID, image, config.DockerBaseImage)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
-						"container": container,
+						"container": scontainer,
 						"ip":        agentHost,
 					})
 					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -223,12 +235,12 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 
 				// Use the given Dockerfile as the base image.
 				log.Println("Building Dockerfile to image for", container.ImageID)
-				_, err := buildImage(true, map[string]string{
+				_, err = buildImage(true, map[string]string{
 					"Dockerfile": containerReq.Dockerfile,
 				}, nil, image, progChan)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
-						"container": container,
+						"container": scontainer,
 						"ip":        agentHost,
 					})
 					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -259,7 +271,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 				}, image, progChan)
 				if err != nil {
 					go logClient.Error(err.Error(), map[string]interface{}{
-						"container": container,
+						"container": scontainer,
 						"ip":        agentHost,
 					})
 					renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -275,7 +287,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		inspectedBase, err := DockerClient.InspectImage(image)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
-				"container": container,
+				"container": scontainer,
 				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -311,7 +323,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		}, config.DockerBaseImage, nil)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
-				"container": container,
+				"container": scontainer,
 				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -337,7 +349,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		id, err := DockerClient.Create(config, image, []string{"/usr/sbin/sshd", "-D"})
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
-				"container": container,
+				"container": scontainer,
 				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -351,7 +363,7 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		err = DockerClient.Start(config, id)
 		if err != nil {
 			go logClient.Error(err.Error(), map[string]interface{}{
-				"container": container,
+				"container": scontainer,
 				"ip":        agentHost,
 			})
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
@@ -369,8 +381,9 @@ func createContainerHandler(rw http.ResponseWriter, req *http.Request) {
 		container.DockerID = id
 	}
 
+	err = nil
 	currentContainer = container
-	SaveContainer()
+	currentContainer.Save()
 	renderer.JSON(rw, http.StatusOK, map[string]interface{}{
 		"status":    requests.StatusCreated,
 		"container": container,
@@ -650,30 +663,8 @@ func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	})
 
 	if Env != "testing" {
-		// Get the container to remove the build image.
-		log.Println("Inspecting container", currentContainer.ImageID)
-		container, err := DockerClient.Inspect(currentContainer.DockerID)
-		if err != nil {
-			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-				"status": requests.StatusFailed,
-				"error":  err.Error(),
-			})
-			return
-		}
-
-		// Remove the container and its image.
-		log.Println("Removing container", currentContainer.ImageID)
-		err = DockerClient.Remove(currentContainer.DockerID)
-		if err != nil {
-			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
-				"status": requests.StatusFailed,
-				"error":  err.Error(),
-			})
-			return
-		}
-
-		log.Println("Removing runner image", currentContainer.ImageID)
-		err = DockerClient.RemoveImage(container.Image)
+		log.Println("Removing container and runner image", currentContainer.ImageID)
+		err := currentContainer.DeleteDocker()
 		if err != nil {
 			renderer.JSON(rw, http.StatusInternalServerError, map[string]string{
 				"status": requests.StatusFailed,
@@ -684,10 +675,9 @@ func removeContainerHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Remove the containers path/ssh and clean up the current container.
-	os.RemoveAll(currentContainer.RemotePath)
-	os.RemoveAll(currentContainer.SSHPath)
+	currentContainer.DeletePaths()
 	currentContainer = nil
-	SaveContainer()
+	currentContainer.Save()
 	renderer.JSON(rw, http.StatusOK, map[string]string{
 		"status": requests.StatusRemoved,
 	})
@@ -748,6 +738,7 @@ func healthzHandler(rw http.ResponseWriter, req *http.Request) {
 func containerStateHandler(rw http.ResponseWriter, req *http.Request) {
 	if currentContainer == nil {
 		rw.Write([]byte("Nothing"))
+		return
 	}
 	containerCopy := *currentContainer
 

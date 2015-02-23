@@ -25,7 +25,8 @@ func TestNewContainer(t *testing.T) {
 }
 
 func TestSaveContainerNoContainer(t *testing.T) {
-	err := SaveContainer()
+	currentContainer = nil
+	err := currentContainer.Save()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +42,8 @@ func TestSaveContainerNoContainer(t *testing.T) {
 }
 
 func TestLoadContainerNoContainer(t *testing.T) {
-	err := LoadContainer()
+	var err error
+	currentContainer, err = LoadContainer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,8 +54,8 @@ func TestLoadContainerNoContainer(t *testing.T) {
 }
 
 func TestSaveContainerSuccessful(t *testing.T) {
-	currentContainer = Ccontainer
-	err := SaveContainer()
+	currentContainer = &Container{Container: Ccontainer}
+	err := currentContainer.Save()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,16 +71,16 @@ func TestSaveContainerSuccessful(t *testing.T) {
 }
 
 func TestLoadContainer(t *testing.T) {
-	err := LoadContainer()
+	container, err := LoadContainer()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if currentContainer == nil {
+	if container == nil {
 		t.Error("currentContainer shouldn't be nil but is.")
 	}
 
-	if currentContainer.ID != Ccontainer.ID {
+	if container.ID != Ccontainer.ID {
 		t.Error("currentContainers ID doesn't match what was set.")
 	}
 

@@ -3,11 +3,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Bowery/gopackages/schemas"
 )
@@ -16,10 +16,16 @@ var (
 	storedContainerPath = filepath.Join(boweryDir, "agent_container.json")
 	containersDir       = filepath.Join(boweryDir, "containers")
 	sshDir              = filepath.Join(boweryDir, "ssh")
+	currentContainer    *Container
 )
 
-// NewContainer creates the remote path for the given container.
-func NewContainer(container *schemas.Container) (*schemas.Container, error) {
+// Container wraps a schemas container to provide methods on it.
+type Container struct {
+	*schemas.Container
+}
+
+// NewContainer creates the paths for the given container.
+func NewContainer(container *schemas.Container) (*Container, error) {
 	root := filepath.Join(containersDir, container.ID)
 	if err := os.MkdirAll(root, os.ModePerm|os.ModeDir); err != nil {
 		return nil, err
@@ -32,49 +38,44 @@ func NewContainer(container *schemas.Container) (*schemas.Container, error) {
 
 	container.RemotePath = root
 	container.SSHPath = sshPath
-	return container, nil
+	return &Container{Container: container}, nil
 }
 
 // LoadContainer reads the stored container info and creates it in memory.
-func LoadContainer() error {
+func LoadContainer() (*Container, error) {
 	file, err := os.Open(storedContainerPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return nil, nil
 		}
 
-		return err
+		return nil, err
 	}
 	defer file.Close()
 
-	var containers []*schemas.Container
+	var containers []*Container
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(&containers)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	container := containers[0] // Will always be available.
-
 	if container != nil {
-		_, err = NewContainer(container)
-		if err != nil {
-			return err
-		}
+		container, err = NewContainer(container.Container)
 	}
 
-	currentContainer = container
-	return nil
+	return container, err
 }
 
-// SaveContainer saves the current container.
-func SaveContainer() error {
+// Save saves the container info to the FS.
+func (container *Container) Save() error {
 	// Use slice so loading can capture null, rather than the zero value.
-	container := []*schemas.Container{currentContainer}
-	dat, err := json.MarshalIndent(container, "", "  ")
+	containers := []*Container{container}
+	dat, err := json.MarshalIndent(containers, "", "  ")
 	if err != nil {
 		return err
 	}
-	buf := bytes.NewBuffer(dat)
 
 	err = os.MkdirAll(boweryDir, os.ModePerm|os.ModeDir)
 	if err != nil {
@@ -87,6 +88,33 @@ func SaveContainer() error {
 	}
 	defer file.Close()
 
-	_, err = io.Copy(file, buf)
+	_, err = io.Copy(file, strings.NewReader(string(dat)))
 	return err
+}
+
+// DeleteContainer removes the Docker container for the container and it's
+// image.
+func (container *Container) DeleteDocker() error {
+	// Inspect to get the containers image.
+	dcontainer, err := DockerClient.Inspect(container.DockerID)
+	if err != nil {
+		return err
+	}
+
+	err = DockerClient.Remove(container.DockerID)
+	if err != nil {
+		return err
+	}
+
+	return DockerClient.RemoveImage(dcontainer.Image)
+}
+
+// Delete deletes the containers paths.
+func (container *Container) DeletePaths() error {
+	err := os.RemoveAll(container.RemotePath)
+	if err != nil {
+		return err
+	}
+
+	return os.RemoveAll(container.SSHPath)
 }
